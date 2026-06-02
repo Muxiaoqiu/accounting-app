@@ -1,7 +1,11 @@
 package com.muxiaoqiu.accounting.ui.screens
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,7 +34,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.muxiaoqiu.accounting.data.entity.CategoryEntity
 import com.muxiaoqiu.accounting.ui.theme.CATEGORY_EMOJI
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,9 +57,7 @@ fun CategoryManageScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         floatingActionButton = {
@@ -71,42 +72,23 @@ fun CategoryManageScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // ── Tab Row ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Tab(
-                    selected = currentType == 0,
-                    onClick = { currentType = 0 },
-                    modifier = Modifier.weight(1f)
-                ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Tab(selected = currentType == 0, onClick = { currentType = 0 }, modifier = Modifier.weight(1f)) {
                     Text(
-                        "支出",
-                        modifier = Modifier.padding(vertical = 12.dp),
-                        fontWeight = if (currentType == 0) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 15.sp
+                        "支出", modifier = Modifier.padding(vertical = 12.dp),
+                        fontWeight = if (currentType == 0) FontWeight.Bold else FontWeight.Normal, fontSize = 15.sp
                     )
                 }
-                Tab(
-                    selected = currentType == 1,
-                    onClick = { currentType = 1 },
-                    modifier = Modifier.weight(1f)
-                ) {
+                Tab(selected = currentType == 1, onClick = { currentType = 1 }, modifier = Modifier.weight(1f)) {
                     Text(
-                        "收入",
-                        modifier = Modifier.padding(vertical = 12.dp),
-                        fontWeight = if (currentType == 1) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 15.sp
+                        "收入", modifier = Modifier.padding(vertical = 12.dp),
+                        fontWeight = if (currentType == 1) FontWeight.Bold else FontWeight.Normal, fontSize = 15.sp
                     )
                 }
             }
 
-            // ── Category List ──
             ReorderableCategoryList(
                 items = categories,
-                type = currentType,
                 onDelete = { viewModel.deleteCategory(it) },
                 onReorder = { from, to -> viewModel.reorder(currentType, from, to) }
             )
@@ -121,12 +103,9 @@ fun CategoryManageScreen(
             title = { Text("添加类别") },
             text = {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("类别名称") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium
+                    value = name, onValueChange = { name = it },
+                    label = { Text("类别名称") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium
                 )
             },
             confirmButton = {
@@ -137,133 +116,164 @@ fun CategoryManageScreen(
                             showAddDialog = false
                         }
                     },
-                    enabled = name.isNotBlank(),
-                    shape = MaterialTheme.shapes.medium
+                    enabled = name.isNotBlank(), shape = MaterialTheme.shapes.medium
                 ) { Text("添加") }
             },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) { Text("取消") }
-            }
+            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("取消") } }
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReorderableCategoryList(
     items: List<CategoryEntity>,
-    type: Int,
     onDelete: (Long) -> Unit,
     onReorder: (Int, Int) -> Unit
 ) {
     var draggedIndex by remember { mutableIntStateOf(-1) }
     var dragAccumulated by remember { mutableFloatStateOf(0f) }
+    var confirmingId by remember { mutableLongStateOf(-1L) }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
+    val itemHeightPx = with(density) { 64.dp.toPx() }
 
-    val estimatedItemHeight = with(density) { 72.dp.toPx() }
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
+            val isDragged = index == draggedIndex
+            val isConfirming = confirmingId == category.id
+            val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            CategoryRow(
+                emoji = emoji,
+                name = category.name,
+                isDragged = isDragged,
+                isConfirming = isConfirming,
+                dragOffset = if (isDragged) dragAccumulated else 0f,
+                onDeleteClick = { confirmingId = category.id },
+                onConfirmDelete = {
+                    onDelete(category.id)
+                    confirmingId = -1L
+                },
+                onCancelConfirm = { confirmingId = -1L },
+                onDragStart = {
+                    draggedIndex = index
+                    dragAccumulated = 0f
+                    confirmingId = -1L
+                },
+                onDrag = { offset ->
+                    dragAccumulated += offset.y
+                    val targetIdx = (index + (dragAccumulated / itemHeightPx).roundToInt())
+                        .coerceIn(0, items.size - 1)
+                    if (targetIdx != draggedIndex) {
+                        onReorder(draggedIndex, targetIdx)
+                        draggedIndex = targetIdx
+                        dragAccumulated = 0f
+                    }
+                },
+                onDragEnd = { draggedIndex = -1; dragAccumulated = 0f },
+                onDragCancel = { draggedIndex = -1; dragAccumulated = 0f }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryRow(
+    emoji: String,
+    name: String,
+    isDragged: Boolean,
+    isConfirming: Boolean,
+    dragOffset: Float,
+    onDeleteClick: () -> Unit,
+    onConfirmDelete: () -> Unit,
+    onCancelConfirm: () -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit
+) {
+    val density = LocalDensity.current
+    val contentOffsetX by animateDpAsState(if (isConfirming) (-72).dp else 0.dp, label = "slide")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .zIndex(if (isDragged) 2f else 0f)
+            .offset(y = if (isDragged) with(density) { dragOffset.toDp() } else 0.dp)
+            .shadow(elevation = if (isDragged) 8.dp else 1.dp, shape = MaterialTheme.shapes.medium),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDragged) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
-                val isDragged = index == draggedIndex
-                val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
+            // ── Left delete button: tap to start confirm flow ──
+            IconButton(onClick = onDeleteClick, modifier = Modifier.size(44.dp)) {
+                Icon(
+                    Icons.Default.Delete, contentDescription = "删除",
+                    tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp)
+                )
+            }
 
-                SwipeToDismissBox(
-                    state = rememberSwipeToDismissBoxState(
-                        confirmValueChange = { value ->
-                            if (value == SwipeToDismissBoxValue.EndToStart) {
-                                onDelete(category.id)
-                                true
-                            } else false
-                        }
-                    ),
-                    enableDismissFromStartToEnd = false,
-                    backgroundContent = {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(MaterialTheme.shapes.medium)
-                                .background(MaterialTheme.colorScheme.error)
-                                .padding(horizontal = 24.dp),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            Text("删除", color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                    }
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // ── Content (slides left when confirming) ──
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .offset(x = contentOffsetX),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = emoji, fontSize = 22.sp)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = name, style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface
+                )
+                // ── Drag handle: long-press to reorder ──
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .pointerInput(Unit) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { onDragStart() },
+                                onDrag = { change, offset ->
+                                    change.consume()
+                                    onDrag(offset)
+                                },
+                                onDragEnd = onDragEnd,
+                                onDragCancel = onDragCancel
+                            )
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .zIndex(if (isDragged) 2f else 0f)
-                            .offset(y = if (isDragged) with(density) { dragAccumulated.toDp() } else 0.dp)
-                            .shadow(
-                                elevation = if (isDragged) 8.dp else 1.dp,
-                                shape = MaterialTheme.shapes.medium
-                            )
-                            .pointerInput(index) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        draggedIndex = index
-                                        dragAccumulated = 0f
-                                    },
-                                    onDrag = { change, offset ->
-                                        change.consume()
-                                        dragAccumulated += offset.y
+                    Icon(
+                        Icons.Default.DragHandle, contentDescription = "长按拖动排序",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
 
-                                        val targetIdx =
-                                            (index + (dragAccumulated / estimatedItemHeight).roundToInt())
-                                                .coerceIn(0, items.size - 1)
-                                        if (targetIdx != draggedIndex) {
-                                            onReorder(draggedIndex, targetIdx)
-                                            draggedIndex = targetIdx
-                                            dragAccumulated = 0f
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        draggedIndex = -1
-                                        dragAccumulated = 0f
-                                    },
-                                    onDragCancel = {
-                                        draggedIndex = -1
-                                        dragAccumulated = 0f
-                                    }
-                                )
-                            },
-                        shape = MaterialTheme.shapes.medium,
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (isDragged)
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-                            else
-                                MaterialTheme.colorScheme.surface
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = emoji, fontSize = 22.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = category.name,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.weight(1f),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Icon(
-                                Icons.Default.DragHandle,
-                                contentDescription = "长按拖动排序",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
+            // ── Confirm delete button (slides in when confirming) ──
+            if (isConfirming) {
+                Box(
+                    modifier = Modifier
+                        .width(72.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.error)
+                        .clickable { onConfirmDelete() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("删除", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
