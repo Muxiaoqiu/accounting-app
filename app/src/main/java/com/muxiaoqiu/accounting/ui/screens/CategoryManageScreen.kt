@@ -1,16 +1,12 @@
 package com.muxiaoqiu.accounting.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -20,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,7 +43,7 @@ fun CategoryManageScreen(
     val expenses by viewModel.expenseCategories.collectAsState(initial = emptyList())
     val incomes by viewModel.incomeCategories.collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
-    val categories = if (currentType == 0) expenses else incomes
+    val dbCategories = if (currentType == 0) expenses else incomes
 
     Scaffold(
         topBar = {
@@ -74,23 +71,19 @@ fun CategoryManageScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Tab(selected = currentType == 0, onClick = { currentType = 0 }, modifier = Modifier.weight(1f)) {
-                    Text(
-                        "支出", modifier = Modifier.padding(vertical = 12.dp),
-                        fontWeight = if (currentType == 0) FontWeight.Bold else FontWeight.Normal, fontSize = 15.sp
-                    )
+                    Text("支出", modifier = Modifier.padding(vertical = 12.dp),
+                        fontWeight = if (currentType == 0) FontWeight.Bold else FontWeight.Normal, fontSize = 15.sp)
                 }
                 Tab(selected = currentType == 1, onClick = { currentType = 1 }, modifier = Modifier.weight(1f)) {
-                    Text(
-                        "收入", modifier = Modifier.padding(vertical = 12.dp),
-                        fontWeight = if (currentType == 1) FontWeight.Bold else FontWeight.Normal, fontSize = 15.sp
-                    )
+                    Text("收入", modifier = Modifier.padding(vertical = 12.dp),
+                        fontWeight = if (currentType == 1) FontWeight.Bold else FontWeight.Normal, fontSize = 15.sp)
                 }
             }
 
             ReorderableCategoryList(
-                items = categories,
+                dbItems = dbCategories,
                 onDelete = { viewModel.deleteCategory(it) },
-                onReorder = { from, to -> viewModel.reorder(currentType, from, to) }
+                onSaveOrder = { viewModel.saveOrder(it) }
             )
         }
     }
@@ -98,8 +91,7 @@ fun CategoryManageScreen(
     if (showAddDialog) {
         var name by remember { mutableStateOf("") }
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            shape = MaterialTheme.shapes.large,
+            onDismissRequest = { showAddDialog = false }, shape = MaterialTheme.shapes.large,
             title = { Text("添加类别") },
             text = {
                 OutlinedTextField(
@@ -112,7 +104,7 @@ fun CategoryManageScreen(
                 Button(
                     onClick = {
                         if (name.isNotBlank()) {
-                            viewModel.addCategory(name.trim(), currentType, categories.size)
+                            viewModel.addCategory(name.trim(), currentType, dbCategories.size)
                             showAddDialog = false
                         }
                     },
@@ -126,24 +118,32 @@ fun CategoryManageScreen(
 
 @Composable
 private fun ReorderableCategoryList(
-    items: List<CategoryEntity>,
+    dbItems: List<CategoryEntity>,
     onDelete: (Long) -> Unit,
-    onReorder: (Int, Int) -> Unit
+    onSaveOrder: (List<CategoryEntity>) -> Unit
 ) {
+    // Local mutable list for instant drag feedback
+    var localItems by remember { mutableStateOf(dbItems) }
     var draggedIndex by remember { mutableIntStateOf(-1) }
+    var trackedIndex by remember { mutableIntStateOf(-1) }
     var dragAccumulated by remember { mutableFloatStateOf(0f) }
     var confirmingId by remember { mutableLongStateOf(-1L) }
-    val listState = rememberLazyListState()
     val density = LocalDensity.current
     val itemHeightPx = with(density) { 64.dp.toPx() }
 
+    // Sync from DB when not dragging
+    LaunchedEffect(dbItems, draggedIndex) {
+        if (draggedIndex < 0) {
+            localItems = dbItems
+        }
+    }
+
     LazyColumn(
-        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
-            val isDragged = index == draggedIndex
+        itemsIndexed(localItems, key = { _, item -> item.id }) { index, category ->
+            val isDragged = index == trackedIndex
             val isConfirming = confirmingId == category.id
             val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
 
@@ -158,24 +158,38 @@ private fun ReorderableCategoryList(
                     onDelete(category.id)
                     confirmingId = -1L
                 },
-                onCancelConfirm = { confirmingId = -1L },
                 onDragStart = {
                     draggedIndex = index
+                    trackedIndex = index
                     dragAccumulated = 0f
                     confirmingId = -1L
                 },
                 onDrag = { offset ->
                     dragAccumulated += offset.y
-                    val targetIdx = (index + (dragAccumulated / itemHeightPx).roundToInt())
-                        .coerceIn(0, items.size - 1)
-                    if (targetIdx != draggedIndex) {
-                        onReorder(draggedIndex, targetIdx)
-                        draggedIndex = targetIdx
+                    val targetIdx = (trackedIndex + (dragAccumulated / itemHeightPx).roundToInt())
+                        .coerceIn(0, localItems.size - 1)
+                    if (targetIdx != trackedIndex) {
+                        // Instant local reorder
+                        val newList = localItems.toMutableList()
+                        val item = newList.removeAt(trackedIndex)
+                        newList.add(targetIdx, item)
+                        localItems = newList
+                        trackedIndex = targetIdx
                         dragAccumulated = 0f
                     }
                 },
-                onDragEnd = { draggedIndex = -1; dragAccumulated = 0f },
-                onDragCancel = { draggedIndex = -1; dragAccumulated = 0f }
+                onDragEnd = {
+                    draggedIndex = -1
+                    trackedIndex = -1
+                    dragAccumulated = 0f
+                    onSaveOrder(localItems)
+                },
+                onDragCancel = {
+                    draggedIndex = -1
+                    trackedIndex = -1
+                    dragAccumulated = 0f
+                    localItems = dbItems // revert
+                }
             )
         }
     }
@@ -190,7 +204,6 @@ private fun CategoryRow(
     dragOffset: Float,
     onDeleteClick: () -> Unit,
     onConfirmDelete: () -> Unit,
-    onCancelConfirm: () -> Unit,
     onDragStart: () -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -215,7 +228,6 @@ private fun CategoryRow(
             modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // ── Left delete button: tap to start confirm flow ──
             IconButton(onClick = onDeleteClick, modifier = Modifier.size(44.dp)) {
                 Icon(
                     Icons.Default.Delete, contentDescription = "删除",
@@ -225,11 +237,8 @@ private fun CategoryRow(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            // ── Content (slides left when confirming) ──
             Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .offset(x = contentOffsetX),
+                modifier = Modifier.weight(1f).offset(x = contentOffsetX),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = emoji, fontSize = 22.sp)
@@ -238,7 +247,6 @@ private fun CategoryRow(
                     text = name, style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface
                 )
-                // ── Drag handle: long-press to reorder ──
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -263,12 +271,10 @@ private fun CategoryRow(
                 }
             }
 
-            // ── Confirm delete button (slides in when confirming) ──
             if (isConfirming) {
                 Box(
                     modifier = Modifier
-                        .width(72.dp)
-                        .fillMaxHeight()
+                        .width(72.dp).fillMaxHeight()
                         .background(MaterialTheme.colorScheme.error)
                         .clickable { onConfirmDelete() },
                     contentAlignment = Alignment.Center

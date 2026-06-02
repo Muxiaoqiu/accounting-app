@@ -34,13 +34,9 @@ class CategoryViewModel(private val dao: CategoryDao) : ViewModel() {
         }
     }
 
-    fun reorder(type: Int, fromIndex: Int, toIndex: Int) {
+    fun saveOrder(categories: List<CategoryEntity>) {
         viewModelScope.launch {
-            val list = dao.getByType(type).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList()).value.toMutableList()
-            if (fromIndex < 0 || fromIndex >= list.size || toIndex < 0 || toIndex >= list.size) return@launch
-            val item = list.removeAt(fromIndex)
-            list.add(toIndex, item)
-            list.forEachIndexed { index, entity ->
+            categories.forEachIndexed { index, entity ->
                 dao.updateSortOrder(entity.id, index)
             }
         }
