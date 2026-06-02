@@ -1,7 +1,7 @@
 package com.muxiaoqiu.accounting.ui.screens
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,16 +18,19 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.muxiaoqiu.accounting.data.entity.CategoryEntity
 import com.muxiaoqiu.accounting.ui.theme.CATEGORY_EMOJI
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -145,6 +148,7 @@ fun CategoryManageScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReorderableCategoryList(
     items: List<CategoryEntity>,
@@ -152,100 +156,114 @@ private fun ReorderableCategoryList(
     onDelete: (Long) -> Unit,
     onReorder: (Int, Int) -> Unit
 ) {
-    // Track drag state
     var draggedIndex by remember { mutableIntStateOf(-1) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragAccumulated by remember { mutableFloatStateOf(0f) }
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
 
-    val itemHeight = 64 // dp per item (approximate)
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val itemHeightPx = with(density) { itemHeight.dp.toPx() }
+    val estimatedItemHeight = with(density) { 72.dp.toPx() }
 
-    LazyColumn(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
-            val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
-            val offsetY = if (index == draggedIndex) dragOffset else 0f
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
+                val isDragged = index == draggedIndex
+                val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .zIndex(if (index == draggedIndex) 1f else 0f)
-                    .then(
-                        if (index == draggedIndex) Modifier.offset(y = with(density) { offsetY.toDp() })
-                        else Modifier
-                    )
-                    .shadow(
-                        elevation = if (index == draggedIndex) 8.dp else 0.dp,
-                        shape = MaterialTheme.shapes.medium
+                SwipeToDismissBox(
+                    state = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.EndToStart) {
+                                onDelete(category.id)
+                                true
+                            } else false
+                        }
                     ),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // ── Delete Button ──
-                    IconButton(
-                        onClick = { onDelete(category.id) },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "删除",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
-                        )
+                    enableDismissFromStartToEnd = false,
+                    backgroundContent = {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(MaterialTheme.shapes.medium)
+                                .background(MaterialTheme.colorScheme.error)
+                                .padding(horizontal = 24.dp),
+                            contentAlignment = Alignment.CenterEnd
+                        ) {
+                            Text("删除", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
                     }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // ── Emoji + Name ──
-                    Text(text = emoji, fontSize = 20.sp)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = category.name,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.weight(1f),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    // ── Drag Handle ──
-                    Icon(
-                        Icons.Default.DragHandle,
-                        contentDescription = "长按拖动排序",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                ) {
+                    Card(
                         modifier = Modifier
-                            .size(32.dp)
-                            .pointerInput(Unit) {
+                            .fillMaxWidth()
+                            .zIndex(if (isDragged) 2f else 0f)
+                            .offset(y = if (isDragged) with(density) { dragAccumulated.toDp() } else 0.dp)
+                            .shadow(
+                                elevation = if (isDragged) 8.dp else 1.dp,
+                                shape = MaterialTheme.shapes.medium
+                            )
+                            .pointerInput(index) {
                                 detectDragGesturesAfterLongPress(
-                                    onDragStart = { draggedIndex = index; dragOffset = 0f },
+                                    onDragStart = {
+                                        draggedIndex = index
+                                        dragAccumulated = 0f
+                                    },
                                     onDrag = { change, offset ->
                                         change.consume()
-                                        dragOffset += offset.y
-                                        val targetIndex = (index + (dragOffset / itemHeightPx).roundToInt())
-                                            .coerceIn(0, items.size - 1)
-                                        if (targetIndex != draggedIndex) {
-                                            onReorder(draggedIndex, targetIndex)
-                                            draggedIndex = targetIndex
-                                            dragOffset = 0f
+                                        dragAccumulated += offset.y
+
+                                        val targetIdx =
+                                            (index + (dragAccumulated / estimatedItemHeight).roundToInt())
+                                                .coerceIn(0, items.size - 1)
+                                        if (targetIdx != draggedIndex) {
+                                            onReorder(draggedIndex, targetIdx)
+                                            draggedIndex = targetIdx
+                                            dragAccumulated = 0f
                                         }
                                     },
                                     onDragEnd = {
                                         draggedIndex = -1
-                                        dragOffset = 0f
+                                        dragAccumulated = 0f
                                     },
                                     onDragCancel = {
                                         draggedIndex = -1
-                                        dragOffset = 0f
+                                        dragAccumulated = 0f
                                     }
                                 )
-                            }
-                    )
+                            },
+                        shape = MaterialTheme.shapes.medium,
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isDragged)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                            else
+                                MaterialTheme.colorScheme.surface
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = emoji, fontSize = 22.sp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = category.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Icon(
+                                Icons.Default.DragHandle,
+                                contentDescription = "长按拖动排序",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
