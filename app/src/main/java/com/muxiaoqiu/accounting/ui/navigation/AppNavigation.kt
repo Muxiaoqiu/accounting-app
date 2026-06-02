@@ -10,6 +10,8 @@ import com.muxiaoqiu.accounting.ui.screens.AccountingViewModel
 import com.muxiaoqiu.accounting.ui.screens.AddTransactionScreen
 import com.muxiaoqiu.accounting.ui.screens.BookListScreen
 import com.muxiaoqiu.accounting.ui.screens.BookViewModel
+import com.muxiaoqiu.accounting.ui.screens.CategoryManageScreen
+import com.muxiaoqiu.accounting.ui.screens.CategoryViewModel
 import com.muxiaoqiu.accounting.ui.screens.HomeScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -18,6 +20,7 @@ object Routes {
     const val BOOKS = "books"
     const val HOME = "home/{bookId}/{bookName}"
     const val ADD = "add/{bookId}"
+    const val CATEGORIES = "categories"
 
     fun home(bookId: Long, bookName: String) = "home/$bookId/${URLEncoder.encode(bookName, "UTF-8")}"
     fun add(bookId: Long) = "add/$bookId"
@@ -26,7 +29,8 @@ object Routes {
 @Composable
 fun AppNavigation(
     bookViewModel: BookViewModel,
-    accountingViewModel: AccountingViewModel
+    accountingViewModel: AccountingViewModel,
+    categoryViewModel: CategoryViewModel
 ) {
     val navController = rememberNavController()
 
@@ -71,6 +75,14 @@ fun AppNavigation(
             AddTransactionScreen(
                 bookId = bookId,
                 viewModel = accountingViewModel,
+                categoryViewModel = categoryViewModel,
+                onBack = { navController.popBackStack() },
+                onSettingsClick = { navController.navigate(Routes.CATEGORIES) }
+            )
+        }
+        composable(Routes.CATEGORIES) {
+            CategoryManageScreen(
+                viewModel = categoryViewModel,
                 onBack = { navController.popBackStack() }
             )
         }
