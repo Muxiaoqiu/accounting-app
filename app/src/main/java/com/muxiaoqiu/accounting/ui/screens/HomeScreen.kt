@@ -31,9 +31,9 @@ fun HomeScreen(
     viewModel: AccountingViewModel,
     onAddClick: () -> Unit
 ) {
-    val transactions by viewModel.transactions.collectAsState()
-    val expense by viewModel.totalExpense.collectAsState()
-    val income by viewModel.totalIncome.collectAsState()
+    val transactions by viewModel.transactions.collectAsState(initial = emptyList())
+    val expense by viewModel.totalExpense.collectAsState(initial = null)
+    val income by viewModel.totalIncome.collectAsState(initial = null)
 
     Scaffold(
         floatingActionButton = {
