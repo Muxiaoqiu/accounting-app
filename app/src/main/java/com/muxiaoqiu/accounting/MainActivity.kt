@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import com.muxiaoqiu.accounting.ui.navigation.AppNavigation
 import com.muxiaoqiu.accounting.ui.screens.AccountingViewModel
 import com.muxiaoqiu.accounting.ui.screens.BookViewModel
+import com.muxiaoqiu.accounting.ui.theme.AccountingTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,10 +19,12 @@ class MainActivity : ComponentActivity() {
         val accountingViewModel = AccountingViewModel(app.database.transactionDao())
 
         setContent {
-            AppNavigation(
-                bookViewModel = bookViewModel,
-                accountingViewModel = accountingViewModel
-            )
+            AccountingTheme {
+                AppNavigation(
+                    bookViewModel = bookViewModel,
+                    accountingViewModel = accountingViewModel
+                )
+            }
         }
     }
 }
