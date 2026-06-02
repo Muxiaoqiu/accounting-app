@@ -1,7 +1,6 @@
 package com.muxiaoqiu.accounting.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,9 +8,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -26,16 +27,34 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    bookId: Long,
+    bookName: String,
     viewModel: AccountingViewModel,
-    onAddClick: () -> Unit
+    onAddClick: () -> Unit,
+    onBack: () -> Unit
 ) {
+    LaunchedEffect(bookId) {
+        viewModel.setBook(bookId)
+    }
+
     val transactions by viewModel.transactions.collectAsState(initial = emptyList())
     val expense by viewModel.totalExpense.collectAsState(initial = null)
     val income by viewModel.totalIncome.collectAsState(initial = null)
 
     Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(bookName) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddClick,

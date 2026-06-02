@@ -9,17 +9,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TransactionDao {
 
-    @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
-    fun getAll(): Flow<List<Transaction>>
+    @Query("SELECT * FROM transactions WHERE bookId = :bookId ORDER BY timestamp DESC")
+    fun getAll(bookId: Long): Flow<List<Transaction>>
 
-    @Query("SELECT * FROM transactions WHERE type = :type ORDER BY timestamp DESC")
-    fun getByType(type: Int): Flow<List<Transaction>>
+    @Query("SELECT SUM(amount) FROM transactions WHERE bookId = :bookId AND type = 0")
+    fun getTotalExpense(bookId: Long): Flow<Double?>
 
-    @Query("SELECT SUM(amount) FROM transactions WHERE type = 0")
-    fun getTotalExpense(): Flow<Double?>
-
-    @Query("SELECT SUM(amount) FROM transactions WHERE type = 1")
-    fun getTotalIncome(): Flow<Double?>
+    @Query("SELECT SUM(amount) FROM transactions WHERE bookId = :bookId AND type = 1")
+    fun getTotalIncome(bookId: Long): Flow<Double?>
 
     @Insert
     suspend fun insert(transaction: Transaction)

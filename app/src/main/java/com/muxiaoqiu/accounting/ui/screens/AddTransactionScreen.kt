@@ -1,10 +1,9 @@
 package com.muxiaoqiu.accounting.ui.screens
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -19,6 +18,7 @@ private val INCOME_CATEGORIES = listOf("工资", "兼职", "理财", "红包", "
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
+    bookId: Long,
     viewModel: AccountingViewModel,
     onBack: () -> Unit
 ) {
@@ -35,7 +35,7 @@ fun AddTransactionScreen(
                 title = { Text("记一笔") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 }
             )
@@ -47,7 +47,6 @@ fun AddTransactionScreen(
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            // 支出/收入切换
             Row(modifier = Modifier.fillMaxWidth()) {
                 FilterChip(
                     selected = isExpense,
@@ -66,7 +65,6 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 金额输入
             OutlinedTextField(
                 value = amount,
                 onValueChange = { if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d{0,2}$"))) amount = it },
@@ -79,7 +77,6 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 分类选择
             Text("选择分类", style = MaterialTheme.typography.titleSmall)
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -102,7 +99,6 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // 备注
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
@@ -113,13 +109,13 @@ fun AddTransactionScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // 保存按钮
             Button(
                 onClick = {
                     val amt = amount.toDoubleOrNull() ?: return@Button
                     if (selectedCategory.isEmpty()) return@Button
                     viewModel.addTransaction(
                         Transaction(
+                            bookId = bookId,
                             amount = amt,
                             category = selectedCategory,
                             note = note,

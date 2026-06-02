@@ -4,21 +4,38 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.muxiaoqiu.accounting.data.dao.TransactionDao
 import com.muxiaoqiu.accounting.data.entity.Transaction
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AccountingViewModel(private val dao: TransactionDao) : ViewModel() {
 
-    val transactions: Flow<List<Transaction>> = dao.getAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _bookId = MutableStateFlow(-1L)
+    val bookId: StateFlow<Long> = _bookId
 
-    val totalExpense: Flow<Double?> = dao.getTotalExpense()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val transactions = _bookId.flatMapLatest { id ->
+        if (id == -1L) kotlinx.coroutines.flow.flowOf(emptyList())
+        else dao.getAll(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val totalIncome: Flow<Double?> = dao.getTotalIncome()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val totalExpense = _bookId.flatMapLatest { id ->
+        if (id == -1L) kotlinx.coroutines.flow.flowOf(null)
+        else dao.getTotalExpense(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val totalIncome = _bookId.flatMapLatest { id ->
+        if (id == -1L) kotlinx.coroutines.flow.flowOf(null)
+        else dao.getTotalIncome(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun setBook(bookId: Long) {
+        _bookId.value = bookId
+    }
 
     fun addTransaction(transaction: Transaction) {
         viewModelScope.launch {
