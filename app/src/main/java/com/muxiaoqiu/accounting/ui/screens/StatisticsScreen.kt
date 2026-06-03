@@ -356,14 +356,6 @@ private fun CategoryRow(slice: CategorySlice, iconMap: Map<String, String>) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Amount on the left
-            Text(
-                "¥ %.2f".format(slice.amount),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.width(80.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
             Text(text = emoji, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(4.dp))
             Text(
@@ -375,6 +367,12 @@ private fun CategoryRow(slice: CategorySlice, iconMap: Map<String, String>) {
                 pctText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "¥ %.2f".format(slice.amount),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
