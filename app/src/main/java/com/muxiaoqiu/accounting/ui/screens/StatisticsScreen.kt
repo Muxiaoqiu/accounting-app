@@ -1,11 +1,12 @@
 package com.muxiaoqiu.accounting.ui.screens
 
 import android.graphics.Paint
-import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -14,24 +15,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muxiaoqiu.accounting.ui.theme.CATEGORY_EMOJI
 import kotlin.math.abs
-import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.min
 
@@ -58,9 +61,6 @@ fun StatisticsScreen(
         (expenseCategories + incomeCategories).associate { it.name to it.icon }
     }
 
-    var selectedTab by remember { mutableStateOf(0) }
-    val tabs = listOf("趋势", "分类")
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -80,65 +80,127 @@ fun StatisticsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
         ) {
-            TabRow(selectedTabIndex = selectedTab) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = { Text(title, fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal) }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ── Period selector (affects both charts) ──
+            PeriodSelector(
+                selected = trendPeriod,
+                onSelect = { viewModel.setTrendPeriod(it) }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Trend chart ──
+            SectionTitle("趋势")
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (trendData.isEmpty() || trendData.all { it.expense == 0.0 && it.income == 0.0 }) {
+                EmptyChart()
+            } else {
+                TrendChart(data = trendData, modifier = Modifier.fillMaxWidth().height(260.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Pie chart ──
+            SectionTitle("分类占比")
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Type toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                FilterChip(
+                    selected = pieType == 0,
+                    onClick = { viewModel.setPieType(0) },
+                    label = { Text("支出") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.error
                     )
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                FilterChip(
+                    selected = pieType == 1,
+                    onClick = { viewModel.setPieType(1) },
+                    label = { Text("收入") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (pieData.isEmpty()) {
+                EmptyChart()
+            } else {
+                PieChart(pieData, modifier = Modifier.fillMaxWidth().height(200.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val total = pieData.sumOf { it.amount }
+                Text(
+                    "合计: ¥ %.2f".format(total),
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                pieData.forEach { slice ->
+                    CategoryRow(slice, categoryIconMap)
                 }
             }
 
-            when (selectedTab) {
-                0 -> TrendTab(trendPeriod = trendPeriod, data = trendData, onPeriodChange = { viewModel.setTrendPeriod(it) })
-                1 -> CategoryTab(pieType = pieType, data = pieData, categoryIconMap = categoryIconMap, onTypeChange = { viewModel.setPieType(it) })
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun TrendTab(trendPeriod: TrendPeriod, data: List<TrendPoint>, onPeriodChange: (TrendPeriod) -> Unit) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        // Period selector
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            TrendPeriod.entries.forEach { period ->
-                val label = when (period) {
-                    TrendPeriod.WEEK -> "周"
-                    TrendPeriod.MONTH -> "月"
-                    TrendPeriod.YEAR -> "年"
-                }
-                val selected = period == trendPeriod
-                Surface(
-                    modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .clickable { onPeriodChange(period) },
-                    shape = MaterialTheme.shapes.medium,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Text(
-                        text = label,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                        color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
-        }
+private fun SectionTitle(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onBackground
+    )
+}
 
-        Spacer(modifier = Modifier.height(16.dp))
+@Composable
+private fun EmptyChart() {
+    Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+        Text("暂无数据", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+    }
+}
 
-        if (data.isEmpty() || data.all { it.expense == 0.0 && it.income == 0.0 }) {
-            Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                Text("暂无数据", color = MaterialTheme.colorScheme.onSurfaceVariant)
+@Composable
+private fun PeriodSelector(selected: TrendPeriod, onSelect: (TrendPeriod) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        TrendPeriod.entries.forEach { period ->
+            val label = when (period) {
+                TrendPeriod.WEEK -> "周"
+                TrendPeriod.MONTH -> "月"
+                TrendPeriod.YEAR -> "年"
             }
-        } else {
-            TrendChart(data = data, modifier = Modifier.fillMaxWidth().height(280.dp))
+            FilterChip(
+                selected = period == selected,
+                onClick = { onSelect(period) },
+                label = { Text(label, fontWeight = if (period == selected) FontWeight.Bold else FontWeight.Normal) },
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
         }
     }
 }
@@ -148,23 +210,21 @@ private fun TrendChart(data: List<TrendPoint>, modifier: Modifier = Modifier) {
     val expenseColor = Color(0xFFE57373)
     val incomeColor = Color(0xFF81C784)
     val surplusColor = Color(0xFF64B5F6)
-
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(modifier = modifier) {
-        // Legend
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
         ) {
-            LegendItem(color = expenseColor, label = "支出")
-            Spacer(modifier = Modifier.width(16.dp))
-            LegendItem(color = incomeColor, label = "收入")
-            Spacer(modifier = Modifier.width(16.dp))
-            LegendItem(color = surplusColor, label = "结余")
+            LegendDot(color = expenseColor, label = "支出")
+            Spacer(modifier = Modifier.width(20.dp))
+            LegendDot(color = incomeColor, label = "收入")
+            Spacer(modifier = Modifier.width(20.dp))
+            LegendDot(color = surplusColor, label = "结余")
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         val density = LocalDensity.current
         val labelPaint = remember(density) {
@@ -186,31 +246,28 @@ private fun TrendChart(data: List<TrendPoint>, modifier: Modifier = Modifier) {
             val w = size.width
             val h = size.height
             val leftPad = 48.dp.toPx()
-            val rightPad = 16.dp.toPx()
-            val topPad = 16.dp.toPx()
-            val bottomPad = 28.dp.toPx()
+            val rightPad = 12.dp.toPx()
+            val topPad = 12.dp.toPx()
+            val bottomPad = 24.dp.toPx()
             val chartW = w - leftPad - rightPad
             val chartH = h - topPad - bottomPad
 
-            // Grid lines + Y labels
-            val gridLines = 4
-            for (i in 0..gridLines) {
-                val y = topPad + chartH * i / gridLines
-                drawLine(Color.LightGray.copy(alpha = 0.5f), Offset(leftPad, y), Offset(w - rightPad, y), strokeWidth = 1f)
-
-                val label = String.format("%.0f", maxVal * (gridLines - i) / gridLines)
-                drawContext.canvas.nativeCanvas.drawText(label, leftPad - 8.dp.toPx(), y + 4.dp.toPx(), labelPaint)
+            for (i in 0..4) {
+                val y = topPad + chartH * i / 4
+                drawLine(Color.LightGray.copy(alpha = 0.4f), Offset(leftPad, y), Offset(w - rightPad, y), strokeWidth = 1f)
+                val label = String.format("%.0f", maxVal * (4 - i) / 4)
+                drawContext.canvas.nativeCanvas.drawText(label, leftPad - 6.dp.toPx(), y + 4.dp.toPx(), labelPaint)
             }
 
-            // Zero line
-            val zeroY = topPad + chartH
             val stepX = chartW / (data.size - 1).coerceAtLeast(1)
-
-            // X labels
             data.forEachIndexed { index, point ->
                 if (point.label.isNotEmpty()) {
-                    val x = leftPad + stepX * index
-                    drawContext.canvas.nativeCanvas.drawText(point.label, x, h - 2.dp.toPx(), labelPaint)
+                    drawContext.canvas.nativeCanvas.drawText(
+                        point.label,
+                        leftPad + stepX * index,
+                        h - 2.dp.toPx(),
+                        labelPaint
+                    )
                 }
             }
 
@@ -219,7 +276,7 @@ private fun TrendChart(data: List<TrendPoint>, modifier: Modifier = Modifier) {
                 return topPad + chartH * (1f - ratio)
             }
 
-            fun drawLine(values: List<Double>, color: Color) {
+            fun drawDataLine(values: List<Double>, color: Color) {
                 val path = Path()
                 values.forEachIndexed { i, v ->
                     val x = leftPad + stepX * i
@@ -227,24 +284,20 @@ private fun TrendChart(data: List<TrendPoint>, modifier: Modifier = Modifier) {
                     if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
                 drawPath(path, color, style = Stroke(width = lineStroke))
-
-                // Dots
                 values.forEachIndexed { i, v ->
-                    val x = leftPad + stepX * i
-                    val y = yPos(v)
-                    drawCircle(color, dotRadius, Offset(x, y))
+                    drawCircle(color, dotRadius, Offset(leftPad + stepX * i, yPos(v)))
                 }
             }
 
-            drawLine(data.map { it.expense }, expenseColor)
-            drawLine(data.map { it.income }, incomeColor)
-            drawLine(data.map { it.surplus }, surplusColor)
+            drawDataLine(data.map { it.expense }, expenseColor)
+            drawDataLine(data.map { it.income }, incomeColor)
+            drawDataLine(data.map { it.surplus }, surplusColor)
         }
     }
 }
 
 @Composable
-private fun LegendItem(color: Color, label: String) {
+private fun LegendDot(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Canvas(modifier = Modifier.size(10.dp)) {
             drawCircle(color, radius = 5.dp.toPx())
@@ -255,141 +308,91 @@ private fun LegendItem(color: Color, label: String) {
 }
 
 @Composable
-private fun CategoryTab(
-    pieType: Int,
-    data: List<CategorySlice>,
-    categoryIconMap: Map<String, String>,
-    onTypeChange: (Int) -> Unit
-) {
-    Column(modifier = Modifier.padding(16.dp)) {
-        // Toggle
+private fun PieChart(data: List<CategorySlice>, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
+    val labelPaint = remember(density) {
+        Paint().apply {
+            color = Color.White.toArgb()
+            textSize = with(density) { 11.sp.toPx() }
+            textAlign = Paint.Align.CENTER
+        }
+    }
+
+    Canvas(modifier = modifier) {
+        val diameter = min(size.width, size.height) * 0.85f
+        val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
+        val arcSize = Size(diameter, diameter)
+        val cx = topLeft.x + diameter / 2f
+        val cy = topLeft.y + diameter / 2f
+
+        var startAngle = -90f
+        data.forEach { slice ->
+            val sweep = slice.percentage * 360f
+            if (sweep > 0f) {
+                drawArc(slice.color, startAngle, sweep, true, topLeft, arcSize)
+                if (slice.percentage >= 0.05f) {
+                    val mid = startAngle + sweep / 2f
+                    val rad = Math.toRadians(mid.toDouble())
+                    val lr = diameter * 0.32f
+                    val lx = cx + lr * kotlin.math.cos(rad).toFloat()
+                    val ly = cy + lr * kotlin.math.sin(rad).toFloat()
+                    drawContext.canvas.nativeCanvas.drawText(
+                        "${(slice.percentage * 100).toInt()}%", lx, ly + 4.dp.toPx(), labelPaint
+                    )
+                }
+            }
+            startAngle += sweep
+        }
+    }
+}
+
+@Composable
+private fun CategoryRow(slice: CategorySlice, iconMap: Map<String, String>) {
+    val emoji = iconMap[slice.name] ?: CATEGORY_EMOJI[slice.name] ?: "📋"
+    val pctText = "${(slice.percentage * 100).toInt()}%"
+
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                modifier = Modifier.padding(horizontal = 4.dp).clickable { onTypeChange(0) },
-                shape = MaterialTheme.shapes.medium,
-                color = if (pieType == 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Text(
-                    "支出",
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    fontWeight = if (pieType == 0) FontWeight.Bold else FontWeight.Normal,
-                    color = if (pieType == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Surface(
-                modifier = Modifier.padding(horizontal = 4.dp).clickable { onTypeChange(1) },
-                shape = MaterialTheme.shapes.medium,
-                color = if (pieType == 1) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Text(
-                    "收入",
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    fontWeight = if (pieType == 1) FontWeight.Bold else FontWeight.Normal,
-                    color = if (pieType == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (data.isEmpty()) {
-            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                Text("暂无数据", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            val total = remember(data) { data.sumOf { it.amount } }
-            val density = LocalDensity.current
-            val labelPaint = remember(density) {
-                Paint().apply {
-                    color = Color.Black.copy(alpha = 0.7f).toArgb()
-                    textSize = with(density) { 12.sp.toPx() }
-                    textAlign = Paint.Align.CENTER
-                }
-            }
-
-            // Pie chart
-            Canvas(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-                val diameter = min(size.width, size.height) * 0.8f
-                val topLeft = Offset((size.width - diameter) / 2f, (size.height - diameter) / 2f)
-                val arcSize = Size(diameter, diameter)
-                val centerX = topLeft.x + diameter / 2f
-                val centerY = topLeft.y + diameter / 2f
-
-                var startAngle = -90f
-                data.forEach { slice ->
-                    val sweepAngle = slice.percentage * 360f
-                    if (sweepAngle > 0f) {
-                        drawArc(
-                            color = slice.color,
-                            startAngle = startAngle,
-                            sweepAngle = sweepAngle,
-                            useCenter = true,
-                            topLeft = topLeft,
-                            size = arcSize
-                        )
-                        if (slice.percentage >= 0.05f) {
-                            val midAngle = startAngle + sweepAngle / 2f
-                            val rad = Math.toRadians(midAngle.toDouble())
-                            val labelRadius = diameter * 0.35f
-                            val lx = centerX + labelRadius * kotlin.math.cos(rad).toFloat()
-                            val ly = centerY + labelRadius * kotlin.math.sin(rad).toFloat()
-                            drawContext.canvas.nativeCanvas.drawText(
-                                "${(slice.percentage * 100).toInt()}%",
-                                lx, ly + 4.dp.toPx(), labelPaint
-                            )
-                        }
-                    }
-                    startAngle += sweepAngle
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Total
+            // Amount on the left
             Text(
-                "合计: ¥ %.2f".format(total),
-                modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                "¥ %.2f".format(slice.amount),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.width(80.dp)
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Legend
-            data.forEach { slice ->
-                val emoji = categoryIconMap[slice.name] ?: CATEGORY_EMOJI[slice.name] ?: "📋"
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Canvas(modifier = Modifier.size(12.dp)) {
-                        drawCircle(slice.color, radius = 6.dp.toPx())
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = emoji, fontSize = 14.sp)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = slice.name,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "¥ %.2f".format(slice.amount),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = " ${(slice.percentage * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(text = emoji, fontSize = 14.sp)
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                slice.name,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Text(
+                pctText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        // Progress bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(slice.percentage)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(slice.color)
+            )
         }
     }
 }
