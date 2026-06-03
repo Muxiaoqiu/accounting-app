@@ -22,18 +22,26 @@ class AccountingViewModel(private val dao: TransactionDao) : ViewModel() {
 
     private val cal = Calendar.getInstance()
     private val _selectedYear = MutableStateFlow(cal.get(Calendar.YEAR))
-    private val _selectedMonth = MutableStateFlow(cal.get(Calendar.MONTH)) // 0-based, null = full year
+    // null = full year, 0-11 = specific month
+    private val _selectedMonth = MutableStateFlow<Int?>(cal.get(Calendar.MONTH))
 
     val selectedYear: StateFlow<Int> = _selectedYear
-    val selectedMonth: StateFlow<Int> = _selectedMonth
+    val selectedMonth: StateFlow<Int?> = _selectedMonth
 
     val periodLabel: StateFlow<String> = combine(_selectedYear, _selectedMonth) { year, month ->
-        "${year}年${month + 1}月"
+        if (month == null) "${year}年" else "${year}年${month + 1}月"
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
-    val transactions = _bookId.flatMapLatest { id ->
-        if (id == -1L) flowOf(emptyList())
-        else dao.getAll(id)
+    // transactions filtered by selected period
+    val transactions = combine(_bookId, _selectedYear, _selectedMonth) { id, year, month ->
+        if (id == -1L) null else Triple(id, year, month)
+    }.flatMapLatest { triple ->
+        if (triple == null) flowOf(emptyList())
+        else {
+            val (id, year, month) = triple
+            val (start, end) = getTimeRange(year, month)
+            dao.getTransactionsInRange(id, start, end)
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalExpense = combine(_bookId, _selectedYear, _selectedMonth) { id, year, month ->
@@ -66,7 +74,7 @@ class AccountingViewModel(private val dao: TransactionDao) : ViewModel() {
         _selectedYear.value = year
     }
 
-    fun selectMonth(month: Int) {
+    fun selectMonth(month: Int?) {
         _selectedMonth.value = month
     }
 
@@ -82,13 +90,24 @@ class AccountingViewModel(private val dao: TransactionDao) : ViewModel() {
         }
     }
 
-    private fun getTimeRange(year: Int, month: Int): Pair<Long, Long> {
+    private fun getTimeRange(year: Int, month: Int?): Pair<Long, Long> {
         val cal = Calendar.getInstance()
-        cal.set(year, month, 1, 0, 0, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-        cal.add(Calendar.MONTH, 1)
-        val end = cal.timeInMillis
-        return Pair(start, end)
+        if (month == null) {
+            // Full year
+            cal.set(year, 0, 1, 0, 0, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val start = cal.timeInMillis
+            cal.add(Calendar.YEAR, 1)
+            val end = cal.timeInMillis
+            return Pair(start, end)
+        } else {
+            // Specific month
+            cal.set(year, month, 1, 0, 0, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val start = cal.timeInMillis
+            cal.add(Calendar.MONTH, 1)
+            val end = cal.timeInMillis
+            return Pair(start, end)
+        }
     }
 }

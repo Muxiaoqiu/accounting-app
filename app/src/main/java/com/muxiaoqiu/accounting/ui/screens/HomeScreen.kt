@@ -1,9 +1,11 @@
 package com.muxiaoqiu.accounting.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -179,9 +181,9 @@ fun HomeScreen(
 @Composable
 private fun PeriodPickerDialog(
     year: Int,
-    month: Int,
+    month: Int?,  // null = full year
     onYearChanged: (Int) -> Unit,
-    onMonthSelected: (Int) -> Unit,
+    onMonthSelected: (Int?) -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -195,11 +197,21 @@ private fun PeriodPickerDialog(
                 IconButton(onClick = { onYearChanged(year - 1) }) {
                     Icon(Icons.Filled.ChevronLeft, contentDescription = "上一年")
                 }
-                Text(
-                    "${year}年",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+                Surface(
+                    modifier = Modifier.clickable { onMonthSelected(null) },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (month == null) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                ) {
+                    Text(
+                        "${year}年",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (month == null) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurface
+                    )
+                }
                 IconButton(onClick = { onYearChanged(year + 1) }) {
                     Icon(Icons.Filled.ChevronRight, contentDescription = "下一年")
                 }
@@ -207,10 +219,36 @@ private fun PeriodPickerDialog(
         },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // "Full year" option
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onMonthSelected(null) },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (month == null) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "全年",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (month == null) FontWeight.Bold else FontWeight.Normal,
+                            color = if (month == null) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Month grid
                 for (row in 0..2) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         for (col in 0..3) {
                             val m = row * 4 + col
@@ -220,7 +258,7 @@ private fun PeriodPickerDialog(
                                     .weight(1f)
                                     .aspectRatio(1.5f)
                                     .clickable { onMonthSelected(m) },
-                                shape = MaterialTheme.shapes.medium,
+                                shape = RoundedCornerShape(8.dp),
                                 color = if (isSelected) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                             ) {
@@ -236,7 +274,7 @@ private fun PeriodPickerDialog(
                             }
                         }
                     }
-                    if (row < 2) Spacer(modifier = Modifier.height(12.dp))
+                    if (row < 2) Spacer(modifier = Modifier.height(10.dp))
                 }
             }
         },
@@ -290,7 +328,6 @@ private fun SummaryCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-            // ── Period picker button ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Start
@@ -323,7 +360,6 @@ private fun SummaryCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ── Summary items ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
