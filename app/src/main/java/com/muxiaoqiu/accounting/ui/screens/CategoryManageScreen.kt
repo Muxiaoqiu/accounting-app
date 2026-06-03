@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -31,6 +32,7 @@ import androidx.compose.ui.zIndex
 import com.muxiaoqiu.accounting.data.entity.CategoryEntity
 import com.muxiaoqiu.accounting.ui.theme.CATEGORY_EMOJI
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,8 +133,11 @@ private fun DraggableCategoryList(
     val density = LocalDensity.current
     val itemHeightPx = with(density) { 64.dp.toPx() }
     val spacingPx = with(density) { 8.dp.toPx() }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -168,6 +173,25 @@ private fun DraggableCategoryList(
                         // Compensate visual offset so the dragged item stays under the finger
                         visualOffset -= (target - currentIdx).toFloat() * (itemHeightPx + spacingPx)
                         onMove(currentIdx, target)
+                    }
+
+                    // Auto-scroll when dragged item is near viewport edges
+                    val layoutInfo = listState.layoutInfo
+                    val draggedInfo = layoutInfo.visibleItemsInfo.find { it.key == draggedItemId }
+                    if (draggedInfo != null) {
+                        val itemTop = draggedInfo.offset + visualOffset
+                        val itemBottom = itemTop + itemHeightPx
+                        val viewportH = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset).toFloat()
+                        val threshold = itemHeightPx
+                        if (itemTop < threshold && listState.canScrollBackward) {
+                            scope.launch {
+                                listState.scroll { scrollBy(-(itemHeightPx + spacingPx)) }
+                            }
+                        } else if (itemBottom > viewportH - threshold && listState.canScrollForward) {
+                            scope.launch {
+                                listState.scroll { scrollBy(itemHeightPx + spacingPx) }
+                            }
+                        }
                     }
                 },
                 onDragEnd = {
