@@ -156,6 +156,7 @@ private fun DraggableCategoryList(
                     onDelete(category.id)
                     confirmingId = -1L
                 },
+                onCancelConfirm = { confirmingId = -1L },
                 onDragStart = {
                     draggedItemId = category.id
                     dragStartIndex = items.indexOfFirst { it.id == category.id }
@@ -220,6 +221,7 @@ private fun CategoryRow(
     dragOffset: Float,
     onDeleteClick: () -> Unit,
     onConfirmDelete: () -> Unit,
+    onCancelConfirm: () -> Unit,
     onDragStart: () -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
@@ -241,28 +243,38 @@ private fun CategoryRow(
         )
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .clip(MaterialTheme.shapes.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onDeleteClick, modifier = Modifier.size(44.dp)) {
-                Icon(
-                    Icons.Default.Delete, contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(4.dp))
-
             Row(
-                modifier = Modifier.weight(1f).offset(x = contentOffsetX),
+                modifier = Modifier
+                    .weight(1f)
+                    .offset(x = contentOffsetX)
+                    .then(
+                        if (isConfirming) Modifier.clickable { onCancelConfirm() }
+                        else Modifier
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = onDeleteClick, modifier = Modifier.size(44.dp)) {
+                    Icon(
+                        Icons.Default.Delete, contentDescription = "删除",
+                        tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
                 Text(text = emoji, fontSize = 22.sp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = name, style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface
                 )
+
                 val currentOnDragStart by rememberUpdatedState(onDragStart)
                 val currentOnDrag by rememberUpdatedState(onDrag)
                 val currentOnDragEnd by rememberUpdatedState(onDragEnd)
@@ -295,7 +307,8 @@ private fun CategoryRow(
             if (isConfirming) {
                 Box(
                     modifier = Modifier
-                        .width(72.dp).fillMaxHeight()
+                        .fillMaxHeight()
+                        .width(72.dp)
                         .background(MaterialTheme.colorScheme.error)
                         .clickable { onConfirmDelete() },
                     contentAlignment = Alignment.Center
