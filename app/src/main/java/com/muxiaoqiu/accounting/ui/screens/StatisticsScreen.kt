@@ -99,6 +99,10 @@ fun StatisticsScreen(
             if (trendData.isEmpty() || trendData.all { it.expense == 0.0 && it.income == 0.0 }) {
                 EmptyChart()
             } else {
+                val totalExpense = remember(trendData) { trendData.sumOf { it.expense } }
+                val totalIncome = remember(trendData) { trendData.sumOf { it.income } }
+                TrendSummary(totalExpense, totalIncome)
+                Spacer(modifier = Modifier.height(8.dp))
                 TrendChart(data = trendData, modifier = Modifier.fillMaxWidth().height(260.dp))
             }
 
@@ -201,6 +205,31 @@ private fun PeriodSelector(selected: TrendPeriod, onSelect: (TrendPeriod) -> Uni
                 label = { Text(label, fontWeight = if (period == selected) FontWeight.Bold else FontWeight.Normal) },
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun TrendSummary(expense: Double, income: Double) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("¥ %.2f".format(expense), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFE57373))
+            Text("总支出", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("¥ %.2f".format(income), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF81C784))
+            Text("总收入", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            val surplus = income - expense
+            val surplusColor = if (surplus >= 0) Color(0xFF64B5F6) else Color(0xFFE57373)
+            Text("¥ %.2f".format(surplus), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = surplusColor)
+            Text("结余", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -358,17 +387,15 @@ private fun CategoryRow(slice: CategorySlice, iconMap: Map<String, String>) {
         ) {
             Text(text = emoji, fontSize = 14.sp)
             Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                slice.name,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f, fill = false)
-            )
+            Text(slice.name, style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 pctText,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(36.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.weight(1f))
             Text(
                 "¥ %.2f".format(slice.amount),
                 style = MaterialTheme.typography.bodyMedium,
