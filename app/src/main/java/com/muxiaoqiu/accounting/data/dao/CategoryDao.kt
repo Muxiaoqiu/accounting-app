@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 interface CategoryDao {
 
     @Query("SELECT * FROM categories WHERE type = :type ORDER BY sortOrder ASC")
+    suspend fun getByTypeList(type: Int): List<CategoryEntity>
+
+    @Query("SELECT * FROM categories WHERE type = :type ORDER BY sortOrder ASC")
     fun getByType(type: Int): Flow<List<CategoryEntity>>
 
     @Query("SELECT COUNT(*) FROM categories")
