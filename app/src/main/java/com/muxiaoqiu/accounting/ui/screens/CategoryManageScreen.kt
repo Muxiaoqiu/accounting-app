@@ -124,7 +124,8 @@ private fun DraggableCategoryList(
     onMove: (Int, Int) -> Unit
 ) {
     var draggedItemId by remember { mutableLongStateOf(-1L) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var dragTotal by remember { mutableFloatStateOf(0f) }
+    var dragStartIndex by remember { mutableIntStateOf(-1) }
     var confirmingId by remember { mutableLongStateOf(-1L) }
     val density = LocalDensity.current
     val itemHeightPx = with(density) { 64.dp.toPx() }
@@ -142,7 +143,7 @@ private fun DraggableCategoryList(
                 name = category.name,
                 isDragged = isDragging,
                 isConfirming = confirmingId == category.id,
-                dragOffset = if (isDragging) dragOffset else 0f,
+                dragOffset = if (isDragging) dragTotal else 0f,
                 onDeleteClick = { confirmingId = category.id },
                 onConfirmDelete = {
                     onDelete(category.id)
@@ -150,28 +151,29 @@ private fun DraggableCategoryList(
                 },
                 onDragStart = {
                     draggedItemId = category.id
-                    dragOffset = 0f
+                    dragStartIndex = items.indexOfFirst { it.id == category.id }
+                    dragTotal = 0f
                     confirmingId = -1L
                 },
                 onDrag = { offset ->
-                    dragOffset += offset.y
-                    // Find current position from live list — never stale
-                    val currentIdx = items.indexOfFirst { it.id == draggedItemId }
-                    if (currentIdx < 0) return@CategoryRow
-                    val target = (currentIdx + (dragOffset / itemHeightPx).roundToInt())
+                    dragTotal += offset.y
+                    // Target relative to drag start origin — offset never resets
+                    val target = (dragStartIndex + (dragTotal / itemHeightPx).roundToInt())
                         .coerceIn(0, items.size - 1)
-                    if (target != currentIdx) {
+                    val currentIdx = items.indexOfFirst { it.id == draggedItemId }
+                    if (currentIdx >= 0 && target != currentIdx) {
                         onMove(currentIdx, target)
-                        dragOffset = 0f
                     }
                 },
                 onDragEnd = {
                     draggedItemId = -1L
-                    dragOffset = 0f
+                    dragTotal = 0f
+                    dragStartIndex = -1
                 },
                 onDragCancel = {
                     draggedItemId = -1L
-                    dragOffset = 0f
+                    dragTotal = 0f
+                    dragStartIndex = -1
                 }
             )
         }
