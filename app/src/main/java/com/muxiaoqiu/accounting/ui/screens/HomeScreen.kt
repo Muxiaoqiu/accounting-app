@@ -1,8 +1,10 @@
 package com.muxiaoqiu.accounting.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
@@ -10,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,7 +21,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muxiaoqiu.accounting.data.entity.Transaction
@@ -46,11 +51,16 @@ fun HomeScreen(
     val transactions by viewModel.transactions.collectAsState(initial = emptyList())
     val expense by viewModel.totalExpense.collectAsState(initial = null)
     val income by viewModel.totalIncome.collectAsState(initial = null)
+    val timeFilter by viewModel.timeFilter.collectAsState(initial = TimeFilter.MONTH)
 
     val expenseCategories by categoryViewModel.expenseCategories.collectAsState(initial = emptyList())
     val incomeCategories by categoryViewModel.incomeCategories.collectAsState(initial = emptyList())
     val categoryIconMap = remember(expenseCategories, incomeCategories) {
         (expenseCategories + incomeCategories).associate { it.name to it.icon }
+    }
+
+    val groupedTransactions = remember(transactions) {
+        groupTransactionsByDay(transactions)
     }
 
     Scaffold(
@@ -91,7 +101,12 @@ fun HomeScreen(
         ) {
             // ── Summary Card ──
             item {
-                SummaryCard(expense = expense ?: 0.0, income = income ?: 0.0)
+                SummaryCard(
+                    expense = expense ?: 0.0,
+                    income = income ?: 0.0,
+                    timeFilter = timeFilter,
+                    onToggleFilter = { viewModel.toggleTimeFilter() }
+                )
             }
 
             // ── Section header ──
@@ -124,12 +139,17 @@ fun HomeScreen(
                     }
                 }
             } else {
-                items(transactions, key = { it.id }) { transaction ->
-                    TransactionCard(
-                        transaction = transaction,
-                        categoryIconMap = categoryIconMap,
-                        onDelete = { viewModel.deleteTransaction(transaction.id) }
-                    )
+                groupedTransactions.forEach { group ->
+                    item(key = "header_${group.dateLabel}") {
+                        DayHeader(dateLabel = group.dateLabel)
+                    }
+                    items(group.transactions, key = { it.id }) { transaction ->
+                        TransactionCard(
+                            transaction = transaction,
+                            categoryIconMap = categoryIconMap,
+                            onDelete = { viewModel.deleteTransaction(transaction.id) }
+                        )
+                    }
                 }
             }
         }
@@ -137,7 +157,37 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SummaryCard(expense: Double, income: Double) {
+private fun DayHeader(dateLabel: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+        Text(
+            text = dateLabel,
+            modifier = Modifier.padding(horizontal = 10.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+    }
+}
+
+@Composable
+private fun SummaryCard(
+    expense: Double,
+    income: Double,
+    timeFilter: TimeFilter,
+    onToggleFilter: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -146,28 +196,66 @@ private fun SummaryCard(expense: Double, income: Double) {
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            SummaryItem(
-                label = "支出",
-                amount = expense,
-                icon = Icons.AutoMirrored.Filled.TrendingDown,
-                amountColor = androidx.compose.ui.graphics.Color(0xFFFFCDD2)
-            )
-            SummaryItem(
-                label = "收入",
-                amount = income,
-                icon = Icons.AutoMirrored.Filled.TrendingUp,
-                amountColor = androidx.compose.ui.graphics.Color(0xFFC8E6C9)
-            )
-            SummaryItem(
-                label = "结余",
-                amount = income - expense,
-                icon = Icons.Outlined.AccountBalance,
-                amountColor = MaterialTheme.colorScheme.onPrimary
-            )
+        Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+            // ── Toggle button row ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onToggleFilter() },
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CalendarMonth,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (timeFilter == TimeFilter.MONTH) "月" else "年",
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Summary items ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                SummaryItem(
+                    label = "支出",
+                    amount = expense,
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
+                    amountColor = androidx.compose.ui.graphics.Color(0xFFFFCDD2)
+                )
+                SummaryItem(
+                    label = "收入",
+                    amount = income,
+                    icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    amountColor = androidx.compose.ui.graphics.Color(0xFFC8E6C9)
+                )
+                SummaryItem(
+                    label = "结余",
+                    amount = income - expense,
+                    icon = Icons.Outlined.AccountBalance,
+                    amountColor = MaterialTheme.colorScheme.onPrimary
+                )
+            }
         }
     }
 }
@@ -309,3 +397,27 @@ private fun formatRelativeTime(timestamp: Long): String {
         else -> SimpleDateFormat("MM/dd", Locale.getDefault()).format(Date(timestamp))
     }
 }
+
+private fun groupTransactionsByDay(transactions: List<Transaction>): List<TransactionGroup> {
+    val dayNames = arrayOf("", "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六")
+    return transactions
+        .groupBy { tx ->
+            val cal = Calendar.getInstance()
+            cal.timeInMillis = tx.timestamp
+            Triple(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH))
+        }
+        .map { (key, list) ->
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.YEAR, key.first)
+            cal.set(Calendar.MONTH, key.second)
+            cal.set(Calendar.DAY_OF_MONTH, key.third)
+            val dayOfWeek = dayNames[cal.get(Calendar.DAY_OF_WEEK)]
+            val label = "${key.second + 1}月${key.third}日 $dayOfWeek"
+            TransactionGroup(dateLabel = label, transactions = list)
+        }
+}
+
+private data class TransactionGroup(
+    val dateLabel: String,
+    val transactions: List<Transaction>
+)

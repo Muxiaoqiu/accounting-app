@@ -2,9 +2,12 @@ package com.muxiaoqiu.accounting.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -17,6 +20,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muxiaoqiu.accounting.data.entity.Transaction
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,10 +38,36 @@ fun AddTransactionScreen(
     var amount by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var selectedDate by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showDatePicker by remember { mutableStateOf(false) }
 
     val expenseCategories by categoryViewModel.expenseCategories.collectAsState(initial = emptyList())
     val incomeCategories by categoryViewModel.incomeCategories.collectAsState(initial = emptyList())
     val categories = if (isExpense) expenseCategories else incomeCategories
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { selectedDate = it }
+                    showDatePicker = false
+                }) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("取消")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -61,6 +94,7 @@ fun AddTransactionScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(padding)
                 .padding(horizontal = 20.dp)
         ) {
@@ -135,7 +169,38 @@ fun AddTransactionScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Date Picker Row ──
+            Text("日期", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDatePicker = true },
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CalendarMonth,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = formatDate(selectedDate),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // ── Category Selection ──
             Text("选择分类", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
@@ -221,7 +286,7 @@ fun AddTransactionScreen(
                 shape = MaterialTheme.shapes.medium
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // ── Save Button ──
             Button(
@@ -234,7 +299,8 @@ fun AddTransactionScreen(
                             amount = amt,
                             category = selectedCategory,
                             note = note,
-                            type = if (isExpense) 0 else 1
+                            type = if (isExpense) 0 else 1,
+                            timestamp = selectedDate
                         )
                     )
                     onBack()
@@ -253,4 +319,24 @@ fun AddTransactionScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
+
+private fun formatDate(timestamp: Long): String {
+    val cal = Calendar.getInstance()
+    val today = Calendar.getInstance()
+    today.set(Calendar.HOUR_OF_DAY, 0)
+    today.set(Calendar.MINUTE, 0)
+    today.set(Calendar.SECOND, 0)
+    today.set(Calendar.MILLISECOND, 0)
+
+    cal.timeInMillis = timestamp
+    val sameDay = cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+            cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)
+
+    val dateFormat = if (sameDay) {
+        SimpleDateFormat("'今天' MM月dd日", Locale.getDefault())
+    } else {
+        SimpleDateFormat("yyyy年MM月dd日", Locale.getDefault())
+    }
+    return dateFormat.format(Date(timestamp))
 }

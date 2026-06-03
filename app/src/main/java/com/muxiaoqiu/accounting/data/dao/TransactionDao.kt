@@ -18,6 +18,12 @@ interface TransactionDao {
     @Query("SELECT SUM(amount) FROM transactions WHERE bookId = :bookId AND type = 1")
     fun getTotalIncome(bookId: Long): Flow<Double?>
 
+    @Query("SELECT SUM(amount) FROM transactions WHERE bookId = :bookId AND type = 0 AND timestamp >= :startTime AND timestamp < :endTime")
+    fun getExpenseInRange(bookId: Long, startTime: Long, endTime: Long): Flow<Double?>
+
+    @Query("SELECT SUM(amount) FROM transactions WHERE bookId = :bookId AND type = 1 AND timestamp >= :startTime AND timestamp < :endTime")
+    fun getIncomeInRange(bookId: Long, startTime: Long, endTime: Long): Flow<Double?>
+
     @Insert
     suspend fun insert(transaction: Transaction)
 
