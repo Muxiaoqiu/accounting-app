@@ -131,8 +131,8 @@ private fun ReorderableCategoryList(
     val density = LocalDensity.current
     val itemHeightPx = with(density) { 64.dp.toPx() }
 
-    // Sync from DB when not dragging
-    LaunchedEffect(dbItems, draggedIndex) {
+    // Sync from DB only when DB actually changes and we're not mid-drag
+    LaunchedEffect(dbItems) {
         if (draggedIndex < 0) {
             localItems = dbItems
         }
