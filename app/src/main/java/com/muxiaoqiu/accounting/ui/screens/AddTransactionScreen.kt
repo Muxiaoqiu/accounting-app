@@ -17,7 +17,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muxiaoqiu.accounting.data.entity.Transaction
-import com.muxiaoqiu.accounting.ui.theme.CATEGORY_EMOJI
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,8 +34,7 @@ fun AddTransactionScreen(
 
     val expenseCategories by categoryViewModel.expenseCategories.collectAsState(initial = emptyList())
     val incomeCategories by categoryViewModel.incomeCategories.collectAsState(initial = emptyList())
-    val categoryNames = if (isExpense) expenseCategories.map { it.name } else incomeCategories.map { it.name }
-    val allItems = categoryNames + "设置"
+    val categories = if (isExpense) expenseCategories else incomeCategories
 
     Scaffold(
         topBar = {
@@ -143,13 +141,14 @@ fun AddTransactionScreen(
             Text("选择分类", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
             Spacer(modifier = Modifier.height(12.dp))
 
-            allItems.chunked(4).forEach { row ->
+            val gridItems = categories.map { it } + null  // null = "设置"
+            gridItems.chunked(4).forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    row.forEach { name ->
-                        if (name == "设置") {
+                    row.forEach { item ->
+                        if (item == null) {
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
@@ -173,8 +172,8 @@ fun AddTransactionScreen(
                                 }
                             }
                         } else {
-                            val isSelected = selectedCategory == name
-                            val emoji = CATEGORY_EMOJI[name] ?: "📋"
+                            val isSelected = selectedCategory == item.name
+                            val emoji = item.icon
                             val bgColor = if (isSelected) {
                                 if (isExpense) MaterialTheme.colorScheme.errorContainer
                                 else MaterialTheme.colorScheme.primaryContainer
@@ -185,7 +184,7 @@ fun AddTransactionScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .aspectRatio(1.2f)
-                                    .clickable { selectedCategory = name },
+                                    .clickable { selectedCategory = item.name },
                                 shape = MaterialTheme.shapes.medium,
                                 color = bgColor
                             ) {
@@ -197,7 +196,7 @@ fun AddTransactionScreen(
                                     Text(text = emoji, fontSize = 24.sp)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = name,
+                                        text = item.name,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = if (isSelected) MaterialTheme.colorScheme.onSurface
                                         else MaterialTheme.colorScheme.onSurfaceVariant

@@ -6,8 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -31,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.muxiaoqiu.accounting.data.entity.CategoryEntity
 import com.muxiaoqiu.accounting.ui.theme.CATEGORY_EMOJI
+import com.muxiaoqiu.accounting.ui.theme.CATEGORY_ICON_GROUPS
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -92,21 +98,114 @@ fun CategoryManageScreen(
 
     if (showAddDialog) {
         var name by remember { mutableStateOf("") }
+        var selectedIcon by remember { mutableStateOf("📋") }
+        var selectedGroup by remember { mutableIntStateOf(0) }
+        var iconManuallySet by remember { mutableStateOf(false) }
+
+        // Auto-suggest icon based on name
+        if (!iconManuallySet) {
+            val suggested = CATEGORY_EMOJI[name.trim()]
+            if (suggested != null) {
+                LaunchedEffect(name) {
+                    selectedIcon = suggested
+                    val idx = CATEGORY_ICON_GROUPS.indexOfFirst { it.icons.contains(suggested) }
+                    if (idx >= 0) selectedGroup = idx
+                }
+            }
+        }
+
         AlertDialog(
             onDismissRequest = { showAddDialog = false }, shape = MaterialTheme.shapes.large,
             title = { Text("添加类别") },
             text = {
-                OutlinedTextField(
-                    value = name, onValueChange = { name = it },
-                    label = { Text("类别名称") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium
-                )
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    OutlinedTextField(
+                        value = name, onValueChange = { name = it },
+                        label = { Text("类别名称") }, singleLine = true,
+                        modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text("选择图标", style = MaterialTheme.typography.titleSmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(selectedIcon, fontSize = 36.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    LazyRow {
+                        items(CATEGORY_ICON_GROUPS.size) { index ->
+                            val grp = CATEGORY_ICON_GROUPS[index]
+                            val sel = selectedGroup == index
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (sel) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .clickable { selectedGroup = index }
+                            ) {
+                                Text(
+                                    grp.name,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    color = if (sel) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val icons = CATEGORY_ICON_GROUPS[selectedGroup].icons
+                    val columns = 5
+                    val rows = (icons.size + columns - 1) / columns
+                    for (row in 0 until rows) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            for (col in 0 until columns) {
+                                val idx = row * columns + col
+                                if (idx < icons.size) {
+                                    val ic = icons[idx]
+                                    val isSel = ic == selectedIcon
+                                    Box(
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .then(
+                                                if (isSel) Modifier.background(
+                                                    MaterialTheme.colorScheme.primaryContainer,
+                                                    RoundedCornerShape(12.dp)
+                                                ) else Modifier
+                                            )
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                selectedIcon = ic
+                                                iconManuallySet = true
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(ic, fontSize = 22.sp)
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.size(44.dp))
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         if (name.isNotBlank()) {
-                            viewModel.addCategory(name.trim(), currentType)
+                            viewModel.addCategory(name.trim(), currentType, selectedIcon)
                             showAddDialog = false
                         }
                     },
@@ -142,7 +241,7 @@ private fun DraggableCategoryList(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
-            val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
+            val emoji = category.icon
             val isDragging = category.id == draggedItemId
 
             CategoryRow(

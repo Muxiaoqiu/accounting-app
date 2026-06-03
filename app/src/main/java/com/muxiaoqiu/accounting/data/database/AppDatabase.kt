@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.muxiaoqiu.accounting.data.dao.BookDao
 import com.muxiaoqiu.accounting.data.dao.CategoryDao
 import com.muxiaoqiu.accounting.data.dao.TransactionDao
@@ -11,7 +13,7 @@ import com.muxiaoqiu.accounting.data.entity.Book
 import com.muxiaoqiu.accounting.data.entity.CategoryEntity
 import com.muxiaoqiu.accounting.data.entity.Transaction
 
-@Database(entities = [Transaction::class, Book::class, CategoryEntity::class], version = 3, exportSchema = false)
+@Database(entities = [Transaction::class, Book::class, CategoryEntity::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun bookDao(): BookDao
@@ -21,13 +23,21 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE categories ADD COLUMN icon TEXT NOT NULL DEFAULT '📋'")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 Room.databaseBuilder(
                     context,
                     AppDatabase::class.java,
                     "accounting.db"
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_3_4)
+                    .fallbackToDestructiveMigration()
+                    .build().also { INSTANCE = it }
             }
         }
     }

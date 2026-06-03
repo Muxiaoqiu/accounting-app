@@ -61,6 +61,7 @@ fun AppNavigation(
                 bookId = bookId,
                 bookName = bookName,
                 viewModel = accountingViewModel,
+                categoryViewModel = categoryViewModel,
                 onAddClick = { navController.navigate(Routes.add(bookId)) },
                 onBack = { navController.popBackStack() }
             )

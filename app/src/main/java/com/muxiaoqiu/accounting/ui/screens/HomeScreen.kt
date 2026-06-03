@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +35,7 @@ fun HomeScreen(
     bookId: Long,
     bookName: String,
     viewModel: AccountingViewModel,
+    categoryViewModel: CategoryViewModel,
     onAddClick: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -44,6 +46,12 @@ fun HomeScreen(
     val transactions by viewModel.transactions.collectAsState(initial = emptyList())
     val expense by viewModel.totalExpense.collectAsState(initial = null)
     val income by viewModel.totalIncome.collectAsState(initial = null)
+
+    val expenseCategories by categoryViewModel.expenseCategories.collectAsState(initial = emptyList())
+    val incomeCategories by categoryViewModel.incomeCategories.collectAsState(initial = emptyList())
+    val categoryIconMap = remember(expenseCategories, incomeCategories) {
+        (expenseCategories + incomeCategories).associate { it.name to it.icon }
+    }
 
     Scaffold(
         topBar = {
@@ -119,6 +127,7 @@ fun HomeScreen(
                 items(transactions, key = { it.id }) { transaction ->
                     TransactionCard(
                         transaction = transaction,
+                        categoryIconMap = categoryIconMap,
                         onDelete = { viewModel.deleteTransaction(transaction.id) }
                     )
                 }
@@ -194,8 +203,10 @@ private fun SummaryItem(
 }
 
 @Composable
-private fun TransactionCard(transaction: Transaction, onDelete: () -> Unit) {
-    val emoji = CATEGORY_EMOJI[transaction.category] ?: "📋"
+private fun TransactionCard(transaction: Transaction, categoryIconMap: Map<String, String>, onDelete: () -> Unit) {
+    val emoji = categoryIconMap[transaction.category]
+        ?: CATEGORY_EMOJI[transaction.category]
+        ?: "📋"
 
     Card(
         modifier = Modifier.fillMaxWidth(),

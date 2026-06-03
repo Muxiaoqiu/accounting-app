@@ -26,10 +26,10 @@ class CategoryViewModel(private val dao: CategoryDao) : ViewModel() {
         }
     }
 
-    fun addCategory(name: String, type: Int) {
+    fun addCategory(name: String, type: Int, icon: String) {
         viewModelScope.launch {
             val flow = if (type == 0) _expenseCategories else _incomeCategories
-            dao.insert(CategoryEntity(name = name, type = type, sortOrder = flow.value.size))
+            dao.insert(CategoryEntity(name = name, type = type, sortOrder = flow.value.size, icon = icon))
             flow.value = dao.getByTypeList(type)
         }
     }
