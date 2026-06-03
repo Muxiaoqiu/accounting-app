@@ -124,11 +124,13 @@ private fun DraggableCategoryList(
     onMove: (Int, Int) -> Unit
 ) {
     var draggedItemId by remember { mutableLongStateOf(-1L) }
-    var dragTotal by remember { mutableFloatStateOf(0f) }
+    var fingerOffset by remember { mutableFloatStateOf(0f) }
+    var visualOffset by remember { mutableFloatStateOf(0f) }
     var dragStartIndex by remember { mutableIntStateOf(-1) }
     var confirmingId by remember { mutableLongStateOf(-1L) }
     val density = LocalDensity.current
     val itemHeightPx = with(density) { 64.dp.toPx() }
+    val spacingPx = with(density) { 8.dp.toPx() }
 
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -143,7 +145,7 @@ private fun DraggableCategoryList(
                 name = category.name,
                 isDragged = isDragging,
                 isConfirming = confirmingId == category.id,
-                dragOffset = if (isDragging) dragTotal else 0f,
+                dragOffset = if (isDragging) visualOffset else 0f,
                 onDeleteClick = { confirmingId = category.id },
                 onConfirmDelete = {
                     onDelete(category.id)
@@ -152,27 +154,32 @@ private fun DraggableCategoryList(
                 onDragStart = {
                     draggedItemId = category.id
                     dragStartIndex = items.indexOfFirst { it.id == category.id }
-                    dragTotal = 0f
+                    fingerOffset = 0f
+                    visualOffset = 0f
                     confirmingId = -1L
                 },
                 onDrag = { offset ->
-                    dragTotal += offset.y
-                    // Target relative to drag start origin — offset never resets
-                    val target = (dragStartIndex + (dragTotal / itemHeightPx).roundToInt())
+                    fingerOffset += offset.y
+                    visualOffset += offset.y
+                    val target = (dragStartIndex + (fingerOffset / itemHeightPx).roundToInt())
                         .coerceIn(0, items.size - 1)
                     val currentIdx = items.indexOfFirst { it.id == draggedItemId }
                     if (currentIdx >= 0 && target != currentIdx) {
+                        // Compensate visual offset so the dragged item stays under the finger
+                        visualOffset -= (target - currentIdx).toFloat() * (itemHeightPx + spacingPx)
                         onMove(currentIdx, target)
                     }
                 },
                 onDragEnd = {
                     draggedItemId = -1L
-                    dragTotal = 0f
+                    fingerOffset = 0f
+                    visualOffset = 0f
                     dragStartIndex = -1
                 },
                 onDragCancel = {
                     draggedItemId = -1L
-                    dragTotal = 0f
+                    fingerOffset = 0f
+                    visualOffset = 0f
                     dragStartIndex = -1
                 }
             )
@@ -232,18 +239,23 @@ private fun CategoryRow(
                     text = name, style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface
                 )
+                val currentOnDragStart by rememberUpdatedState(onDragStart)
+                val currentOnDrag by rememberUpdatedState(onDrag)
+                val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+                val currentOnDragCancel by rememberUpdatedState(onDragCancel)
+
                 Box(
                     modifier = Modifier
                         .size(48.dp)
                         .pointerInput(Unit) {
                             detectDragGesturesAfterLongPress(
-                                onDragStart = { onDragStart() },
+                                onDragStart = { currentOnDragStart() },
                                 onDrag = { change, offset ->
                                     change.consume()
-                                    onDrag(offset)
+                                    currentOnDrag(offset)
                                 },
-                                onDragEnd = onDragEnd,
-                                onDragCancel = onDragCancel
+                                onDragEnd = { currentOnDragEnd() },
+                                onDragCancel = { currentOnDragCancel() }
                             )
                         },
                     contentAlignment = Alignment.Center
