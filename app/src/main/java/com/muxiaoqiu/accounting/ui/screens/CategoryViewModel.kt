@@ -4,27 +4,33 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.muxiaoqiu.accounting.data.dao.CategoryDao
 import com.muxiaoqiu.accounting.data.entity.CategoryEntity
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class CategoryViewModel(private val dao: CategoryDao) : ViewModel() {
 
-    private val _currentType = MutableStateFlow(0)
+    private val _expenseCategories = MutableStateFlow<List<CategoryEntity>>(emptyList())
+    val expenseCategories: StateFlow<List<CategoryEntity>> = _expenseCategories
 
-    val expenseCategories = dao.getByType(0).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    val incomeCategories = dao.getByType(1).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _incomeCategories = MutableStateFlow<List<CategoryEntity>>(emptyList())
+    val incomeCategories: StateFlow<List<CategoryEntity>> = _incomeCategories
 
-    fun setType(type: Int) {
-        _currentType.value = type
+    private var saveJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            dao.getByType(0).collect { _expenseCategories.value = it }
+        }
+        viewModelScope.launch {
+            dao.getByType(1).collect { _incomeCategories.value = it }
+        }
     }
 
-    fun addCategory(name: String, type: Int, afterMaxOrder: Int) {
+    fun addCategory(name: String, type: Int) {
         viewModelScope.launch {
-            dao.insert(CategoryEntity(name = name, type = type, sortOrder = afterMaxOrder))
+            dao.insert(CategoryEntity(name = name, type = type, sortOrder = Int.MAX_VALUE))
         }
     }
 
@@ -34,9 +40,19 @@ class CategoryViewModel(private val dao: CategoryDao) : ViewModel() {
         }
     }
 
-    fun saveOrder(categories: List<CategoryEntity>) {
-        viewModelScope.launch {
-            categories.forEachIndexed { index, entity ->
+    fun moveCategory(type: Int, from: Int, to: Int) {
+        val flow = if (type == 0) _expenseCategories else _incomeCategories
+        val list = flow.value.toMutableList()
+        if (from < 0 || from >= list.size || to < 0 || to >= list.size) return
+
+        val item = list.removeAt(from)
+        list.add(to, item)
+        flow.value = list
+
+        // Cancel previous unfinished save, persist latest order
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            list.forEachIndexed { index, entity ->
                 dao.updateSortOrder(entity.id, index)
             }
         }

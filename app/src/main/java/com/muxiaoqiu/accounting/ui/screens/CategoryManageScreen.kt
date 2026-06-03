@@ -16,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,7 +42,7 @@ fun CategoryManageScreen(
     val expenses by viewModel.expenseCategories.collectAsState(initial = emptyList())
     val incomes by viewModel.incomeCategories.collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
-    val dbCategories = if (currentType == 0) expenses else incomes
+    val categories = if (currentType == 0) expenses else incomes
 
     Scaffold(
         topBar = {
@@ -80,10 +79,11 @@ fun CategoryManageScreen(
                 }
             }
 
-            ReorderableCategoryList(
-                dbItems = dbCategories,
+            DraggableCategoryList(
+                items = categories,
+                type = currentType,
                 onDelete = { viewModel.deleteCategory(it) },
-                onSaveOrder = { viewModel.saveOrder(it) }
+                onMove = { from, to -> viewModel.moveCategory(currentType, from, to) }
             )
         }
     }
@@ -104,7 +104,7 @@ fun CategoryManageScreen(
                 Button(
                     onClick = {
                         if (name.isNotBlank()) {
-                            viewModel.addCategory(name.trim(), currentType, dbCategories.size)
+                            viewModel.addCategory(name.trim(), currentType)
                             showAddDialog = false
                         }
                     },
@@ -117,78 +117,58 @@ fun CategoryManageScreen(
 }
 
 @Composable
-private fun ReorderableCategoryList(
-    dbItems: List<CategoryEntity>,
+private fun DraggableCategoryList(
+    items: List<CategoryEntity>,
+    type: Int,
     onDelete: (Long) -> Unit,
-    onSaveOrder: (List<CategoryEntity>) -> Unit
+    onMove: (Int, Int) -> Unit
 ) {
-    // Local mutable list for instant drag feedback
-    var localItems by remember { mutableStateOf(dbItems) }
-    var draggedIndex by remember { mutableIntStateOf(-1) }
-    var trackedIndex by remember { mutableIntStateOf(-1) }
-    var dragAccumulated by remember { mutableFloatStateOf(0f) }
+    var draggedIdx by remember { mutableIntStateOf(-1) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
     var confirmingId by remember { mutableLongStateOf(-1L) }
     val density = LocalDensity.current
     val itemHeightPx = with(density) { 64.dp.toPx() }
-
-    // Sync from DB only when DB actually changes and we're not mid-drag
-    LaunchedEffect(dbItems) {
-        if (draggedIndex < 0) {
-            localItems = dbItems
-        }
-    }
 
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(localItems, key = { _, item -> item.id }) { index, category ->
-            val isDragged = index == trackedIndex
-            val isConfirming = confirmingId == category.id
+        itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
             val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
 
             CategoryRow(
                 emoji = emoji,
                 name = category.name,
-                isDragged = isDragged,
-                isConfirming = isConfirming,
-                dragOffset = if (isDragged) dragAccumulated else 0f,
+                isDragged = index == draggedIdx,
+                isConfirming = confirmingId == category.id,
+                dragOffset = if (index == draggedIdx) dragOffset else 0f,
                 onDeleteClick = { confirmingId = category.id },
                 onConfirmDelete = {
                     onDelete(category.id)
                     confirmingId = -1L
                 },
                 onDragStart = {
-                    draggedIndex = index
-                    trackedIndex = index
-                    dragAccumulated = 0f
+                    draggedIdx = index
+                    dragOffset = 0f
                     confirmingId = -1L
                 },
                 onDrag = { offset ->
-                    dragAccumulated += offset.y
-                    val targetIdx = (trackedIndex + (dragAccumulated / itemHeightPx).roundToInt())
-                        .coerceIn(0, localItems.size - 1)
-                    if (targetIdx != trackedIndex) {
-                        // Instant local reorder
-                        val newList = localItems.toMutableList()
-                        val item = newList.removeAt(trackedIndex)
-                        newList.add(targetIdx, item)
-                        localItems = newList
-                        trackedIndex = targetIdx
-                        dragAccumulated = 0f
+                    dragOffset += offset.y
+                    val target = (draggedIdx + (dragOffset / itemHeightPx).roundToInt())
+                        .coerceIn(0, items.size - 1)
+                    if (target != draggedIdx) {
+                        onMove(draggedIdx, target)
+                        draggedIdx = target
+                        dragOffset = 0f
                     }
                 },
                 onDragEnd = {
-                    draggedIndex = -1
-                    trackedIndex = -1
-                    dragAccumulated = 0f
-                    onSaveOrder(localItems)
+                    draggedIdx = -1
+                    dragOffset = 0f
                 },
                 onDragCancel = {
-                    draggedIndex = -1
-                    trackedIndex = -1
-                    dragAccumulated = 0f
-                    localItems = dbItems // revert
+                    draggedIdx = -1
+                    dragOffset = 0f
                 }
             )
         }
