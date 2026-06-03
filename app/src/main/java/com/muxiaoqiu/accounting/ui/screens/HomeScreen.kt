@@ -4,26 +4,28 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.AccountBalance
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muxiaoqiu.accounting.data.entity.Transaction
@@ -51,7 +53,7 @@ fun HomeScreen(
     val transactions by viewModel.transactions.collectAsState(initial = emptyList())
     val expense by viewModel.totalExpense.collectAsState(initial = null)
     val income by viewModel.totalIncome.collectAsState(initial = null)
-    val timeFilter by viewModel.timeFilter.collectAsState(initial = TimeFilter.MONTH)
+    val periodLabel by viewModel.periodLabel.collectAsState(initial = "")
 
     val expenseCategories by categoryViewModel.expenseCategories.collectAsState(initial = emptyList())
     val incomeCategories by categoryViewModel.incomeCategories.collectAsState(initial = emptyList())
@@ -61,6 +63,23 @@ fun HomeScreen(
 
     val groupedTransactions = remember(transactions) {
         groupTransactionsByDay(transactions)
+    }
+
+    var showPicker by remember { mutableStateOf(false) }
+    val selectedYear by viewModel.selectedYear.collectAsState(initial = Calendar.getInstance().get(Calendar.YEAR))
+    val selectedMonth by viewModel.selectedMonth.collectAsState(initial = Calendar.getInstance().get(Calendar.MONTH))
+
+    if (showPicker) {
+        PeriodPickerDialog(
+            year = selectedYear,
+            month = selectedMonth,
+            onYearChanged = { viewModel.selectYear(it) },
+            onMonthSelected = { month ->
+                viewModel.selectMonth(month)
+                showPicker = false
+            },
+            onDismiss = { showPicker = false }
+        )
     }
 
     Scaffold(
@@ -104,8 +123,8 @@ fun HomeScreen(
                 SummaryCard(
                     expense = expense ?: 0.0,
                     income = income ?: 0.0,
-                    timeFilter = timeFilter,
-                    onToggleFilter = { viewModel.toggleTimeFilter() }
+                    periodLabel = periodLabel,
+                    onPickPeriod = { showPicker = true }
                 )
             }
 
@@ -156,6 +175,80 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PeriodPickerDialog(
+    year: Int,
+    month: Int,
+    onYearChanged: (Int) -> Unit,
+    onMonthSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { onYearChanged(year - 1) }) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = "上一年")
+                }
+                Text(
+                    "${year}年",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                IconButton(onClick = { onYearChanged(year + 1) }) {
+                    Icon(Icons.Filled.ChevronRight, contentDescription = "下一年")
+                }
+            }
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                for (row in 0..2) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        for (col in 0..3) {
+                            val m = row * 4 + col
+                            val isSelected = m == month
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1.5f)
+                                    .clickable { onMonthSelected(m) },
+                                shape = MaterialTheme.shapes.medium,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        "${m + 1}月",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (row < 2) Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
 @Composable
 private fun DayHeader(dateLabel: String) {
     Row(
@@ -185,8 +278,8 @@ private fun DayHeader(dateLabel: String) {
 private fun SummaryCard(
     expense: Double,
     income: Double,
-    timeFilter: TimeFilter,
-    onToggleFilter: () -> Unit
+    periodLabel: String,
+    onPickPeriod: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -197,16 +290,14 @@ private fun SummaryCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
-            // ── Toggle button row ──
+            // ── Period picker button ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Start
             ) {
                 Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { onToggleFilter() },
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.clickable { onPickPeriod() },
+                    shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                 ) {
                     Row(
@@ -221,7 +312,7 @@ private fun SummaryCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (timeFilter == TimeFilter.MONTH) "月" else "年",
+                            text = periodLabel,
                             color = MaterialTheme.colorScheme.onPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
@@ -377,7 +468,6 @@ private fun TransactionCard(transaction: Transaction, categoryIconMap: Map<Strin
 private fun formatRelativeTime(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
-    val cal = Calendar.getInstance()
 
     val todayStart = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
