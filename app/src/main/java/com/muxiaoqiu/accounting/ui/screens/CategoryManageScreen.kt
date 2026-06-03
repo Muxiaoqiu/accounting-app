@@ -123,7 +123,7 @@ private fun DraggableCategoryList(
     onDelete: (Long) -> Unit,
     onMove: (Int, Int) -> Unit
 ) {
-    var draggedIdx by remember { mutableIntStateOf(-1) }
+    var draggedItemId by remember { mutableLongStateOf(-1L) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var confirmingId by remember { mutableLongStateOf(-1L) }
     val density = LocalDensity.current
@@ -135,39 +135,42 @@ private fun DraggableCategoryList(
     ) {
         itemsIndexed(items, key = { _, item -> item.id }) { index, category ->
             val emoji = CATEGORY_EMOJI[category.name] ?: "📋"
+            val isDragging = category.id == draggedItemId
 
             CategoryRow(
                 emoji = emoji,
                 name = category.name,
-                isDragged = index == draggedIdx,
+                isDragged = isDragging,
                 isConfirming = confirmingId == category.id,
-                dragOffset = if (index == draggedIdx) dragOffset else 0f,
+                dragOffset = if (isDragging) dragOffset else 0f,
                 onDeleteClick = { confirmingId = category.id },
                 onConfirmDelete = {
                     onDelete(category.id)
                     confirmingId = -1L
                 },
                 onDragStart = {
-                    draggedIdx = index
+                    draggedItemId = category.id
                     dragOffset = 0f
                     confirmingId = -1L
                 },
                 onDrag = { offset ->
                     dragOffset += offset.y
-                    val target = (draggedIdx + (dragOffset / itemHeightPx).roundToInt())
+                    // Find current position from live list — never stale
+                    val currentIdx = items.indexOfFirst { it.id == draggedItemId }
+                    if (currentIdx < 0) return@CategoryRow
+                    val target = (currentIdx + (dragOffset / itemHeightPx).roundToInt())
                         .coerceIn(0, items.size - 1)
-                    if (target != draggedIdx) {
-                        onMove(draggedIdx, target)
-                        draggedIdx = target
+                    if (target != currentIdx) {
+                        onMove(currentIdx, target)
                         dragOffset = 0f
                     }
                 },
                 onDragEnd = {
-                    draggedIdx = -1
+                    draggedItemId = -1L
                     dragOffset = 0f
                 },
                 onDragCancel = {
-                    draggedIdx = -1
+                    draggedItemId = -1L
                     dragOffset = 0f
                 }
             )
