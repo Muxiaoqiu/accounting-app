@@ -4,7 +4,7 @@
     <application
         android:name=".AccountingApp"
         android:allowBackup="true"
-        android:label="记账"
+        android:label="考拉记账"
         android:supportsRtl="true"
         android:theme="@style/Theme.AccountingApp">
 
