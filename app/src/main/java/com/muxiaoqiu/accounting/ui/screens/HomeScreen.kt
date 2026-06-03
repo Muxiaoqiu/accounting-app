@@ -1,6 +1,5 @@
 package com.muxiaoqiu.accounting.ui.screens
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -27,8 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.sp
 import com.muxiaoqiu.accounting.data.entity.Transaction
 import com.muxiaoqiu.accounting.ui.theme.CATEGORY_EMOJI
@@ -46,7 +46,8 @@ fun HomeScreen(
     viewModel: AccountingViewModel,
     categoryViewModel: CategoryViewModel,
     onAddClick: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onStatsClick: () -> Unit
 ) {
     LaunchedEffect(bookId) {
         viewModel.setBook(bookId)
@@ -95,6 +96,15 @@ fun HomeScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onStatsClick) {
+                        Icon(
+                            Icons.Filled.BarChart,
+                            contentDescription = "统计",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }

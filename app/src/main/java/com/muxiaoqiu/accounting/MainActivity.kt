@@ -8,6 +8,7 @@ import com.muxiaoqiu.accounting.ui.navigation.AppNavigation
 import com.muxiaoqiu.accounting.ui.screens.AccountingViewModel
 import com.muxiaoqiu.accounting.ui.screens.BookViewModel
 import com.muxiaoqiu.accounting.ui.screens.CategoryViewModel
+import com.muxiaoqiu.accounting.ui.screens.StatisticsViewModel
 import com.muxiaoqiu.accounting.ui.theme.AccountingTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,13 +20,15 @@ class MainActivity : ComponentActivity() {
         val bookViewModel = BookViewModel(app.database.bookDao())
         val accountingViewModel = AccountingViewModel(app.database.transactionDao())
         val categoryViewModel = CategoryViewModel(app.database.categoryDao())
+        val statisticsViewModel = StatisticsViewModel(app.database.transactionDao())
 
         setContent {
             AccountingTheme {
                 AppNavigation(
                     bookViewModel = bookViewModel,
                     accountingViewModel = accountingViewModel,
-                    categoryViewModel = categoryViewModel
+                    categoryViewModel = categoryViewModel,
+                    statisticsViewModel = statisticsViewModel
                 )
             }
         }
