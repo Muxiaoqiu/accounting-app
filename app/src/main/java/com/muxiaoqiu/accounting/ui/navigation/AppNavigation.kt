@@ -10,6 +10,8 @@ import com.muxiaoqiu.accounting.ui.screens.AccountingViewModel
 import com.muxiaoqiu.accounting.ui.screens.AddTransactionScreen
 import com.muxiaoqiu.accounting.ui.screens.BookListScreen
 import com.muxiaoqiu.accounting.ui.screens.BookViewModel
+import com.muxiaoqiu.accounting.ui.screens.BudgetScreen
+import com.muxiaoqiu.accounting.ui.screens.BudgetViewModel
 import com.muxiaoqiu.accounting.ui.screens.CategoryManageScreen
 import com.muxiaoqiu.accounting.ui.screens.CategoryViewModel
 import com.muxiaoqiu.accounting.ui.screens.HomeScreen
@@ -24,10 +26,12 @@ object Routes {
     const val ADD = "add/{bookId}"
     const val CATEGORIES = "categories"
     const val STATS = "stats/{bookId}"
+    const val BUDGET = "budget/{bookId}"
 
     fun home(bookId: Long, bookName: String) = "home/$bookId/${URLEncoder.encode(bookName, "UTF-8")}"
     fun add(bookId: Long) = "add/$bookId"
     fun stats(bookId: Long) = "stats/$bookId"
+    fun budget(bookId: Long) = "budget/$bookId"
 }
 
 @Composable
@@ -35,7 +39,8 @@ fun AppNavigation(
     bookViewModel: BookViewModel,
     accountingViewModel: AccountingViewModel,
     categoryViewModel: CategoryViewModel,
-    statisticsViewModel: StatisticsViewModel
+    statisticsViewModel: StatisticsViewModel,
+    budgetViewModel: BudgetViewModel
 ) {
     val navController = rememberNavController()
 
@@ -67,9 +72,11 @@ fun AppNavigation(
                 bookName = bookName,
                 viewModel = accountingViewModel,
                 categoryViewModel = categoryViewModel,
+                budgetViewModel = budgetViewModel,
                 onAddClick = { navController.navigate(Routes.add(bookId)) },
                 onBack = { navController.popBackStack() },
-                onStatsClick = { navController.navigate(Routes.stats(bookId)) }
+                onStatsClick = { navController.navigate(Routes.stats(bookId)) },
+                onBudgetClick = { navController.navigate(Routes.budget(bookId)) }
             )
         }
         composable(
@@ -103,6 +110,20 @@ fun AppNavigation(
             StatisticsScreen(
                 bookId = bookId,
                 viewModel = statisticsViewModel,
+                categoryViewModel = categoryViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = Routes.BUDGET,
+            arguments = listOf(
+                navArgument("bookId") { type = NavType.LongType }
+            )
+        ) { backStackEntry ->
+            val bookId = backStackEntry.arguments?.getLong("bookId") ?: return@composable
+            BudgetScreen(
+                bookId = bookId,
+                viewModel = budgetViewModel,
                 categoryViewModel = categoryViewModel,
                 onBack = { navController.popBackStack() }
             )

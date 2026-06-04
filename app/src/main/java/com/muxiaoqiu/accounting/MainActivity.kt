@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import com.muxiaoqiu.accounting.ui.navigation.AppNavigation
 import com.muxiaoqiu.accounting.ui.screens.AccountingViewModel
 import com.muxiaoqiu.accounting.ui.screens.BookViewModel
+import com.muxiaoqiu.accounting.ui.screens.BudgetViewModel
 import com.muxiaoqiu.accounting.ui.screens.CategoryViewModel
 import com.muxiaoqiu.accounting.ui.screens.StatisticsViewModel
 import com.muxiaoqiu.accounting.ui.theme.AccountingTheme
@@ -21,6 +22,7 @@ class MainActivity : ComponentActivity() {
         val accountingViewModel = AccountingViewModel(app.database.transactionDao())
         val categoryViewModel = CategoryViewModel(app.database.categoryDao())
         val statisticsViewModel = StatisticsViewModel(app.database.transactionDao())
+        val budgetViewModel = BudgetViewModel(app.database.budgetDao(), app.database.transactionDao())
 
         setContent {
             AccountingTheme {
@@ -28,7 +30,8 @@ class MainActivity : ComponentActivity() {
                     bookViewModel = bookViewModel,
                     accountingViewModel = accountingViewModel,
                     categoryViewModel = categoryViewModel,
-                    statisticsViewModel = statisticsViewModel
+                    statisticsViewModel = statisticsViewModel,
+                    budgetViewModel = budgetViewModel
                 )
             }
         }

@@ -30,6 +30,9 @@ interface TransactionDao {
     @Insert
     suspend fun insert(transaction: Transaction)
 
+    @Query("SELECT SUM(amount) FROM transactions WHERE bookId = :bookId AND type = 0 AND category = :category AND timestamp >= :startTime AND timestamp < :endTime")
+    fun getCategoryExpenseInRange(bookId: Long, category: String, startTime: Long, endTime: Long): Flow<Double?>
+
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun delete(id: Long)
 }

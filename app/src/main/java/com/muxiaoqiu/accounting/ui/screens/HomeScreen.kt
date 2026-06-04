@@ -45,12 +45,15 @@ fun HomeScreen(
     bookName: String,
     viewModel: AccountingViewModel,
     categoryViewModel: CategoryViewModel,
+    budgetViewModel: BudgetViewModel,
     onAddClick: () -> Unit,
     onBack: () -> Unit,
-    onStatsClick: () -> Unit
+    onStatsClick: () -> Unit,
+    onBudgetClick: () -> Unit
 ) {
     LaunchedEffect(bookId) {
         viewModel.setBook(bookId)
+        budgetViewModel.setBook(bookId)
     }
 
     val transactions by viewModel.transactions.collectAsState(initial = emptyList())
@@ -63,6 +66,8 @@ fun HomeScreen(
     val categoryIconMap = remember(expenseCategories, incomeCategories) {
         (expenseCategories + incomeCategories).associate { it.name to it.icon }
     }
+
+    val budgetAlerts by budgetViewModel.alerts.collectAsState(initial = emptyList())
 
     val groupedTransactions = remember(transactions) {
         groupTransactionsByDay(transactions)
@@ -101,6 +106,13 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onBudgetClick) {
+                        Icon(
+                            Icons.Outlined.AccountBalance,
+                            contentDescription = "预算",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     IconButton(onClick = onStatsClick) {
                         Icon(
                             Icons.Filled.BarChart,
@@ -114,13 +126,26 @@ fun HomeScreen(
                 )
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                shape = MaterialTheme.shapes.medium
+        bottomBar = {
+            Surface(
+                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Icon(Icons.Default.Add, contentDescription = "记账", tint = MaterialTheme.colorScheme.onPrimary)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    FloatingActionButton(
+                        onClick = onAddClick,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "记账", tint = MaterialTheme.colorScheme.onPrimary)
+                    }
+                }
             }
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -138,6 +163,16 @@ fun HomeScreen(
                     periodLabel = periodLabel,
                     onPickPeriod = { showPicker = true }
                 )
+            }
+
+            // ── Budget Alerts ──
+            if (budgetAlerts.isNotEmpty()) {
+                item {
+                    BudgetAlertCard(
+                        alerts = budgetAlerts,
+                        onClick = onBudgetClick
+                    )
+                }
             }
 
             // ── Section header ──
