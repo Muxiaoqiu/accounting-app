@@ -218,16 +218,16 @@ private fun TrendSummary(expense: Double, income: Double) {
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("¥ %.2f".format(expense), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFFE57373))
+            Text("¥ %.2f".format(expense), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.error)
             Text("总支出", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("¥ %.2f".format(income), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF81C784))
+            Text("¥ %.2f".format(income), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
             Text("总收入", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             val surplus = income - expense
-            val surplusColor = if (surplus >= 0) Color(0xFF64B5F6) else Color(0xFFE57373)
+            val surplusColor = if (surplus >= 0) Color(0xFF64B5F6) else MaterialTheme.colorScheme.error
             Text("¥ %.2f".format(surplus), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = surplusColor)
             Text("结余", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -236,8 +236,8 @@ private fun TrendSummary(expense: Double, income: Double) {
 
 @Composable
 private fun TrendChart(data: List<TrendPoint>, modifier: Modifier = Modifier) {
-    val expenseColor = Color(0xFFE57373)
-    val incomeColor = Color(0xFF81C784)
+    val expenseColor = MaterialTheme.colorScheme.error
+    val incomeColor = MaterialTheme.colorScheme.primary
     val surplusColor = Color(0xFF64B5F6)
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
 

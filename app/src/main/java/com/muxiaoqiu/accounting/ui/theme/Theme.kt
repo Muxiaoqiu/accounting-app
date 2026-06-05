@@ -9,37 +9,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// ── Brand Colors ──
-private val Green700 = Color(0xFF388E3C)
-private val Green600 = Color(0xFF43A047)
-private val Green50 = Color(0xFFE8F5E9)
-private val Green100 = Color(0xFFC8E6C9)
-private val Amber500 = Color(0xFFFF9800)
-private val Red600 = Color(0xFFE53935)
-private val Red50 = Color(0xFFFFEBEE)
-private val Grey50 = Color(0xFFFAFAFA)
-private val Grey100 = Color(0xFFF5F5F5)
-private val Grey200 = Color(0xFFEEEEEE)
-private val Grey800 = Color(0xFF424242)
-private val Grey900 = Color(0xFF212121)
-private val Grey600 = Color(0xFF757575)
+// ── Blue & Pink Palette ──
+private val Blue500 = Color(0xFF6BA3E0)
+private val Blue600 = Color(0xFF5C9CE6)
+private val Blue50 = Color(0xFFF0F4FA)
+private val Blue100 = Color(0xFFE4EFFB)
+private val Pink400 = Color(0xFFE8788A)
+private val Pink300 = Color(0xFFF08C99)
+private val Pink50 = Color(0xFFFDE8ED)
+private val Pink100 = Color(0xFFFDE4E8)
+private val Grey50 = Color(0xFFF5F7FA)
+private val Grey100 = Color(0xFFE8EDF3)
+private val Grey200 = Color(0xFFD0D8E0)
+private val Grey800 = Color(0xFF2C3E50)
+private val Grey900 = Color(0xFF1A2530)
+private val Grey600 = Color(0xFF6B7B8D)
 
 private val LightColorScheme = lightColorScheme(
-    primary = Green600,
+    primary = Blue500,
     onPrimary = Color.White,
-    primaryContainer = Green100,
-    onPrimaryContainer = Color(0xFF1B5E20),
-    secondary = Amber500,
+    primaryContainer = Blue100,
+    onPrimaryContainer = Color(0xFF1A3A5C),
+    secondary = Pink300,
     onSecondary = Color.White,
-    background = Grey50,
-    onBackground = Grey900,
+    secondaryContainer = Pink100,
+    onSecondaryContainer = Color(0xFF5C2028),
+    background = Blue50,
+    onBackground = Grey800,
     surface = Color.White,
-    onSurface = Grey900,
+    onSurface = Grey800,
     surfaceVariant = Grey100,
     onSurfaceVariant = Grey600,
     outline = Grey200,
-    error = Red600,
-    errorContainer = Red50,
+    error = Pink400,
+    errorContainer = Pink100,
     onError = Color.White
 )
 

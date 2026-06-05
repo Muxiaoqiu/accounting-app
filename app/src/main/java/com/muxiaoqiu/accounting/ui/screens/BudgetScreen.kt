@@ -514,7 +514,7 @@ private fun BudgetCard(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (bws.percentage >= 1f) MaterialTheme.colorScheme.error
-                        else if (bws.percentage >= 0.9f) Color(0xFFFF9800)
+                        else if (bws.percentage >= 0.9f) MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                         else MaterialTheme.colorScheme.primary
                     )
                 }
@@ -524,7 +524,7 @@ private fun BudgetCard(
                 // Progress bar
                 val barColor = when {
                     bws.percentage >= 1f -> MaterialTheme.colorScheme.error
-                    bws.percentage >= 0.9f -> Color(0xFFFF9800)
+                    bws.percentage >= 0.9f -> MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                     else -> MaterialTheme.colorScheme.primary
                 }
                 Box(
