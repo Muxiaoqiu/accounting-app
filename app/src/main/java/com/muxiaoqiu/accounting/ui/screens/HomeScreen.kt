@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -381,11 +380,12 @@ private fun SummaryCard(
     periodLabel: String,
     onPickPeriod: () -> Unit
 ) {
-    val cardBg = Color(0xFFFDE8ED)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = cardBg),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
@@ -396,7 +396,7 @@ private fun SummaryCard(
                 Surface(
                     modifier = Modifier.clickable { onPickPeriod() },
                     shape = MaterialTheme.shapes.small,
-                    color = Color(0xFFF5D0D8)
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -405,13 +405,13 @@ private fun SummaryCard(
                         Icon(
                             imageVector = Icons.Filled.CalendarMonth,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = periodLabel,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -429,19 +429,19 @@ private fun SummaryCard(
                     label = "支出",
                     amount = expense,
                     icon = Icons.AutoMirrored.Filled.TrendingDown,
-                    amountColor = MaterialTheme.colorScheme.error
+                    amountColor = androidx.compose.ui.graphics.Color(0xFFFFCDD2)
                 )
                 SummaryItem(
                     label = "收入",
                     amount = income,
                     icon = Icons.AutoMirrored.Filled.TrendingUp,
-                    amountColor = MaterialTheme.colorScheme.primary
+                    amountColor = androidx.compose.ui.graphics.Color(0xFFC8E6C9)
                 )
                 SummaryItem(
                     label = "结余",
                     amount = income - expense,
                     icon = Icons.Outlined.AccountBalance,
-                    amountColor = MaterialTheme.colorScheme.onSurface
+                    amountColor = MaterialTheme.colorScheme.onPrimary
                 )
             }
         }
@@ -459,7 +459,7 @@ private fun SummaryItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
             modifier = Modifier.size(22.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -472,7 +472,7 @@ private fun SummaryItem(
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
             fontSize = 13.sp
         )
     }

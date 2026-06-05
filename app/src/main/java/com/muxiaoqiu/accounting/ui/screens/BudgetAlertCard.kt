@@ -22,8 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muxiaoqiu.accounting.data.entity.Budget
 
-private val AlertPink = Color(0xFFFDE8ED)
-
 @Composable
 fun BudgetAlertCard(
     alerts: List<BudgetAlert>,
@@ -36,7 +34,7 @@ fun BudgetAlertCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = AlertPink)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -46,7 +44,7 @@ fun BudgetAlertCard(
                     text = "预算提醒",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.error
+                    color = Color(0xFFE65100)
                 )
             }
 
@@ -60,8 +58,7 @@ fun BudgetAlertCard(
                     )
                 }
 
-                val statusColor = if (alert.isOverBudget) MaterialTheme.colorScheme.error
-                else Color(0xFFF08C99)
+                val statusColor = if (alert.isOverBudget) Color(0xFFE53935) else Color(0xFFF57C00)
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -72,21 +69,21 @@ fun BudgetAlertCard(
                             text = buildAlertLabel(alert.budget),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = Color(0xFF424242)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         if (alert.isOverBudget) {
                             Text(
                                 text = "已超支 ¥${"%.2f".format(alert.spent - alert.budget.amount)}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
+                                color = Color(0xFFE53935),
                                 fontWeight = FontWeight.Medium
                             )
                         } else {
                             Text(
                                 text = "剩余 ¥${"%.2f".format(alert.budget.amount - alert.spent)}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color(0xFF757575)
                             )
                         }
                     }
