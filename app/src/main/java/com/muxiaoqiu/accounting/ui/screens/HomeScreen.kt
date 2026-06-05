@@ -207,7 +207,7 @@ fun HomeScreen(
             } else {
                 groupedTransactions.forEach { group ->
                     item(key = "header_${group.dateLabel}") {
-                        DayHeader(dateLabel = group.dateLabel, expense = group.dayExpense)
+                        DayHeader(dateLabel = group.dateLabel, expense = group.dayExpense, income = group.dayIncome)
                     }
                     items(group.transactions, key = { it.id }) { transaction ->
                         TransactionCard(
@@ -333,7 +333,7 @@ private fun PeriodPickerDialog(
 }
 
 @Composable
-private fun DayHeader(dateLabel: String, expense: Double) {
+private fun DayHeader(dateLabel: String, expense: Double, income: Double) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -355,6 +355,14 @@ private fun DayHeader(dateLabel: String, expense: Double) {
                 text = " 支出 ¥%.2f".format(expense),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        if (income > 0) {
+            Text(
+                text = " 收入 ¥%.2f".format(income),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -593,12 +601,14 @@ private fun groupTransactionsByDay(transactions: List<Transaction>): List<Transa
             val dayOfWeek = dayNames[cal.get(Calendar.DAY_OF_WEEK)]
             val label = "${key.second + 1}月${key.third}日 $dayOfWeek"
             val expense = list.filter { it.type == 0 }.sumOf { it.amount }
-            TransactionGroup(dateLabel = label, transactions = list, dayExpense = expense)
+            val income = list.filter { it.type == 1 }.sumOf { it.amount }
+            TransactionGroup(dateLabel = label, transactions = list, dayExpense = expense, dayIncome = income)
         }
 }
 
 private data class TransactionGroup(
     val dateLabel: String,
     val transactions: List<Transaction>,
-    val dayExpense: Double
+    val dayExpense: Double,
+    val dayIncome: Double
 )
